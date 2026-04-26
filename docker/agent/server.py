@@ -14,6 +14,7 @@ POST /v1/chat/completions      OpenAI-compatible completion (passthrough).
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -187,7 +188,7 @@ class _Backend:
                         "type": "function",
                         "function": {
                             "name": block.name,
-                            "arguments": __import__("json").dumps(block.input),
+                            "arguments": json.dumps(block.input),
                         },
                     }
                 )
