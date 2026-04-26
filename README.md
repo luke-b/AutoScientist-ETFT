@@ -264,6 +264,19 @@ python synthesis/sota_plus_one/generate.py --trajectory <trajectory_id>
 
 ---
 
+## 📚 Papers
+
+All papers are located in the [`papers/`](papers/) directory.
+
+| Paper | Description |
+|---|---|
+| [**Evolutionary Trajectory Fine-Tuning**](papers/ETFT.pdf) | The foundational paper introducing ETFT. Proposes training LLMs on ordered sequences of improving algorithms to teach the *direction* of progress. Introduces the Open-Loop Empirical Architecture, 80/20 Δ Analysis, and the Probabilistic Heuristic Filter. *(Benda, April 2026)* |
+| [**The Meta-Evolutionary Epoch**](papers/The%20Meta-Evolutionary%20Epoch.pdf) | A visionary capstone extending ETFT beyond individual algorithms to higher-order Scientific Blueprints and societal paradigms. Argues that the same evolutionary trajectory methodology can accelerate epochal shifts across entire technological and organisational domains. *(Benda, April 2026)* |
+| [**GPU-Poor ETFT Proof of Concept**](papers/PoC-ETFT-GPU-Poor.pdf) | A concrete PoC validating ETFT on a TinyML time-series anomaly-detection benchmark for microcontrollers. Demonstrates autonomous SOTA+1 discovery using only cloud reasoning APIs and a consumer GPU, decoupling hypothesis synthesis from physical evaluation. *(Benda, April 2026)* |
+| [**Peer Review Report**](papers/Concept_LLM.pdf) | Official peer review of the ETFT paper — verdict: *Strong Accept (Recommended for Oral Presentation/Spotlight)*. Provides a detailed critical analysis of the dataset generation architecture, the agentic research loop, and the broader implications of the General Innovation Accelerator vision. *(April 2026)* |
+
+---
+
 ## 📄 Citation
 
 If you use this work in your research, please cite:
