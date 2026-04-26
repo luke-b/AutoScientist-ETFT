@@ -68,12 +68,22 @@ class _Backend:
         if self.backend == "openai":
             import openai
 
-            self._client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "OPENAI_API_KEY environment variable is required for the 'openai' backend."
+                )
+            self._client = openai.OpenAI(api_key=api_key)
 
         elif self.backend == "anthropic":
             import anthropic
 
-            self._client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "ANTHROPIC_API_KEY environment variable is required for the 'anthropic' backend."
+                )
+            self._client = anthropic.Anthropic(api_key=api_key)
 
         elif self.backend == "local":
             import openai

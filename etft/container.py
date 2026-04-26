@@ -105,7 +105,7 @@ class ContainerManager:
             ports={f"{self.port}/tcp": self.port},
             environment=self._proxy_env,
             mem_limit=self.mem_limit,
-            nano_cpus=int(self.cpu_count * 1e9),
+            nano_cpus=int(self.cpu_count * 1_000_000_000),  # Docker expects nanoseconds-equivalent CPU units
             remove=False,
         )
 

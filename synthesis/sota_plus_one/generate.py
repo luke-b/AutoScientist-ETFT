@@ -8,6 +8,11 @@ Usage:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from corpus.regression_pipeline.schemas import SOTAPlusOneCandidate
+
 import argparse
 import json
 import logging
@@ -82,7 +87,7 @@ def generate(
     return results
 
 
-def _route_triage_failure(candidate, cfg: dict) -> None:
+def _route_triage_failure(candidate: "SOTAPlusOneCandidate", cfg: dict) -> None:
     try:
         from feedback.rl_loop.feedback_router import FeedbackRouter
         router = FeedbackRouter(cfg)
