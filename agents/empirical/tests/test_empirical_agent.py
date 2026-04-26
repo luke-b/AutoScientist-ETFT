@@ -9,10 +9,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from agents.empirical.experiment_designer import ExperimentDesigner, _extract_code
-from agents.empirical.metrics_collector import MetricsCollector, MetricsSummary
+from agents.empirical.metrics_collector import MetricsCollector
 from agents.empirical.runner import ExperimentRunner, _parse_metrics
 from corpus.regression_pipeline.schemas import ExperimentResult, ResearchBrief
-
 
 # ---------------------------------------------------------------------------
 # ExperimentDesigner

@@ -87,7 +87,7 @@ def generate(
     return results
 
 
-def _route_triage_failure(candidate: "SOTAPlusOneCandidate", cfg: dict) -> None:
+def _route_triage_failure(candidate: SOTAPlusOneCandidate, cfg: dict) -> None:
     try:
         from feedback.rl_loop.feedback_router import FeedbackRouter
         router = FeedbackRouter(cfg)

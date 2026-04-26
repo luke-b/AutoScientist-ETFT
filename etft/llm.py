@@ -33,10 +33,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+if TYPE_CHECKING:
+    from etft.skills.base import LLMResponse
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +129,7 @@ class LLMClient:
         self,
         messages: list[dict],
         tools: list[dict] | None = None,
-    ) -> "LLMResponse":
+    ) -> LLMResponse:
         """
         Send *messages* to the proxy, optionally with tool definitions.
 

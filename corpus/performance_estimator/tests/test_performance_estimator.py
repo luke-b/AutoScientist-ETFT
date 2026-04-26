@@ -4,18 +4,15 @@ tests/test_performance_estimator.py — Unit tests for corpus/performance_estima
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
 from corpus.performance_estimator.dataset_builder import PerfDatasetBuilder
 from corpus.performance_estimator.feature_extractor import extract_features, feature_names
 from corpus.performance_estimator.filter_model import ProbabilisticFilter
 from corpus.regression_pipeline.schemas import ValidationResult, ValidationStatus
-
 
 # ---------------------------------------------------------------------------
 # feature_extractor

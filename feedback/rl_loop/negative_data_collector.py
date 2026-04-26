@@ -47,7 +47,6 @@ class NegativeDataCollector:
 
     # ------------------------------------------------------------------
     def _append_d_perf(self, record: FailureRecord) -> None:
-        from corpus.performance_estimator.feature_extractor import extract_features
 
         features = record.features or {}
         sample = PerfSample(

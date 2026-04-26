@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from corpus.regression_pipeline.schemas import ExperimentResult, FailureRecord, SOTAPlusOneCandidate
 
-
 # ---------------------------------------------------------------------------
 # Reward construction
 # ---------------------------------------------------------------------------

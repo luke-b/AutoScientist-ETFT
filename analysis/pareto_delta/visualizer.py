@@ -20,7 +20,7 @@ def plot_fitness_trajectory(
     step_indices: list[int],
     fitness_scores: list[float],
     title: str = "Evolutionary Fitness Trajectory",
-) -> "matplotlib.figure.Figure":
+) -> matplotlib.figure.Figure:
     """Line chart of fitness score across trajectory steps."""
     try:
         import matplotlib.pyplot as plt
@@ -42,11 +42,10 @@ def plot_pareto_bar(
     contributions: list[float],
     pareto_threshold: float = 0.80,
     title: str = "Retrospective 80/20 Δ Analysis",
-) -> "matplotlib.figure.Figure":
+) -> matplotlib.figure.Figure:
     """Pareto bar chart with a cumulative contribution line."""
     try:
         import matplotlib.pyplot as plt
-        import numpy as np
     except ImportError as exc:
         raise ImportError("Install matplotlib: pip install 'autoscientist-etft[viz]'") from exc
 
@@ -57,7 +56,7 @@ def plot_pareto_bar(
     fig, ax1 = plt.subplots(figsize=(max(6, len(component_names) * 0.8), 5))
     x = range(len(component_names))
 
-    bars = ax1.bar(x, fractions, color="#dbeafe", edgecolor="#2563eb")
+    ax1.bar(x, fractions, color="#dbeafe", edgecolor="#2563eb")
     ax1.set_xticks(list(x))
     ax1.set_xticklabels(component_names, rotation=30, ha="right")
     ax1.set_ylabel("Fractional Contribution")
@@ -79,7 +78,7 @@ def plot_pareto_interactive(
     contributions: list[float],
     pareto_threshold: float = 0.80,
     title: str = "Retrospective 80/20 Δ Analysis (Interactive)",
-) -> "plotly.graph_objects.Figure":
+) -> plotly.graph_objects.Figure:
     """Interactive Plotly Pareto chart."""
     try:
         import plotly.graph_objects as go

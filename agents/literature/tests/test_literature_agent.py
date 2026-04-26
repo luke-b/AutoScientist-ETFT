@@ -4,14 +4,11 @@ tests/test_literature_agent.py — Unit tests for agents/literature.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from agents.literature.retriever import LiteratureRetriever
 from agents.literature.searcher import LiteratureSearcher, PaperRecord
 from agents.literature.synthesizer import LiteratureSynthesizer, _parse_response
-
 
 # ---------------------------------------------------------------------------
 # PaperRecord

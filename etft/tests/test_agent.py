@@ -4,14 +4,10 @@ etft/tests/test_agent.py — Unit tests for AgentClient ReAct loop.
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from etft.agent import AgentClient
-from etft.skills.base import AgentResult, LLMResponse, Skill, SkillRegistry, ToolCall
-
+from etft.skills.base import LLMResponse, Skill, SkillRegistry, ToolCall
 
 # ---------------------------------------------------------------------------
 # Helpers

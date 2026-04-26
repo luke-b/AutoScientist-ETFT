@@ -13,7 +13,6 @@ import logging
 import uuid
 from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
 from corpus.regression_pipeline.cicd_validator import CICDValidator

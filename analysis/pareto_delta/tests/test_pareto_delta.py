@@ -7,10 +7,9 @@ from __future__ import annotations
 import pytest
 
 from analysis.pareto_delta.bottleneck_reporter import generate_report
-from analysis.pareto_delta.delta_calculator import DeltaCalculator, StepDelta
+from analysis.pareto_delta.delta_calculator import DeltaCalculator
 from analysis.pareto_delta.pareto_ranker import ParetoRanker
 from corpus.regression_pipeline.schemas import TrajectoryStep
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

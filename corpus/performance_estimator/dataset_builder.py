@@ -8,12 +8,11 @@ a PerfSample (features + label) and appended to a JSONL file.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 from corpus.performance_estimator.feature_extractor import extract_features
-from corpus.regression_pipeline.schemas import PerfSample, ValidationResult, ValidationStatus
+from corpus.regression_pipeline.schemas import PerfSample, ValidationResult
 
 logger = logging.getLogger(__name__)
 
