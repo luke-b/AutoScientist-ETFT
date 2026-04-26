@@ -8,7 +8,6 @@ import pytest
 
 from etft.skills.base import AgentResult, LLMResponse, Skill, SkillRegistry, ToolCall
 
-
 # ---------------------------------------------------------------------------
 # Base types
 # ---------------------------------------------------------------------------

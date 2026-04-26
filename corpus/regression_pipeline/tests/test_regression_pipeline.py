@@ -4,10 +4,7 @@ tests/test_regression_pipeline.py — Unit tests for corpus/regression_pipeline.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from corpus.regression_pipeline.cicd_validator import CICDValidator
 from corpus.regression_pipeline.dataset_builder import DatasetBuilder
@@ -18,7 +15,6 @@ from corpus.regression_pipeline.schemas import (
     TrajectoryStep,
     ValidationStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # schemas

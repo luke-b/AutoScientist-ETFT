@@ -5,8 +5,6 @@ tests/test_rl_loop.py — Unit tests for feedback/rl_loop.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,7 +20,6 @@ from feedback.rl_loop.reward_signal import (
     from_experiment_failure,
     from_triage_rejection,
 )
-
 
 # ---------------------------------------------------------------------------
 # reward_signal

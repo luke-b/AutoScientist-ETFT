@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 
 from corpus.regression_pipeline.schemas import TrajectoryStep
 
-
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------

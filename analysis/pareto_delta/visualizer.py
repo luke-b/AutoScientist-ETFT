@@ -20,7 +20,7 @@ def plot_fitness_trajectory(
     step_indices: list[int],
     fitness_scores: list[float],
     title: str = "Evolutionary Fitness Trajectory",
-) -> "matplotlib.figure.Figure":
+) -> matplotlib.figure.Figure:
     """Line chart of fitness score across trajectory steps."""
     try:
         import matplotlib.pyplot as plt
@@ -42,7 +42,7 @@ def plot_pareto_bar(
     contributions: list[float],
     pareto_threshold: float = 0.80,
     title: str = "Retrospective 80/20 Δ Analysis",
-) -> "matplotlib.figure.Figure":
+) -> matplotlib.figure.Figure:
     """Pareto bar chart with a cumulative contribution line."""
     try:
         import matplotlib.pyplot as plt
@@ -79,7 +79,7 @@ def plot_pareto_interactive(
     contributions: list[float],
     pareto_threshold: float = 0.80,
     title: str = "Retrospective 80/20 Δ Analysis (Interactive)",
-) -> "plotly.graph_objects.Figure":
+) -> plotly.graph_objects.Figure:
     """Interactive Plotly Pareto chart."""
     try:
         import plotly.graph_objects as go

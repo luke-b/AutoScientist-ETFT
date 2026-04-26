@@ -126,7 +126,7 @@ class LLMClient:
         self,
         messages: list[dict],
         tools: list[dict] | None = None,
-    ) -> "LLMResponse":
+    ) -> LLMResponse:
         """
         Send *messages* to the proxy, optionally with tool definitions.
 

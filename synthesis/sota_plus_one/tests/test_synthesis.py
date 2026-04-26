@@ -4,15 +4,13 @@ tests/test_synthesis.py — Unit tests for synthesis/sota_plus_one.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from corpus.regression_pipeline.schemas import ResearchBrief, SOTAPlusOneCandidate
 from synthesis.sota_plus_one.synthesizer import SOTAPlusOneSynthesizer, _extract_code_and_rationale
 from synthesis.sota_plus_one.triage import TriageFilter
-
 
 # ---------------------------------------------------------------------------
 # _extract_code_and_rationale
