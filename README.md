@@ -287,6 +287,29 @@ If you use this work in your research, please cite:
 
 ---
 
+## 🖼️ The Evolutionary Race — A Visual Explainer
+
+The comic strip below contrasts the **traditional brute-force AI approach** with the **ETFT Agent**, walking through the full lifecycle in five panels:
+
+| Panel | Title | What Happens |
+|---|---|---|
+| **1 — The Setup** | *Parameter Golf: Compress to 16 MB or Bust!* | The challenge is framed: build a world-class model inside brutal hardware constraints. The Artist (traditional LLM) and the ETFT Agent take the stage. |
+| **2 — The Brute Force Guess** | *Traditional AI* | The Artist randomly stacks layers and hardware, producing an architecturally unsound monstrosity. Quantity over reason. |
+| **3 — Reverse-Engineering Progression** | *The ETFT Approach* | The ETFT Agent identifies historical bottlenecks, extrapolates the structural innovation vector from the evolutionary trajectory (Gen 1 → CNN → Current SOTA), and synthesises the latest literature — all *before* writing a line of code. |
+| **4 — The In-Silico Triage** | *Fatal Error: OOM* | The Artist's brute-force candidate explodes (FZZZ-POP!! KABOOM!). The ETFT Agent's probabilistic filter intercepts the high-risk hypothesis with **Triage Passed. Risk: 0%** — no GPU cycles wasted. |
+| **5 — The SOTA+1 Revelation** | *Hypothesis SOTA+1 Validated* | The ETFT Agent delivers a verified, deployable SOTA+1 candidate. The jury's verdict: *"He didn't just guess… he learned how we invent."* |
+
+<div align="center">
+
+![The Evolutionary Race — A Parameter Golf Tale](https://github.com/user-attachments/assets/1b70bccd-af95-42d2-b694-9575b0c08ba1)
+
+*The Evolutionary Race (A Parameter Golf Tale) — ETFT vs. Traditional LLM Guessing.*
+*The ETFT Agent wins not by trying harder, but by understanding the trajectory of invention.*
+
+</div>
+
+---
+
 <div align="center">
 
 *Built on the conviction that the most powerful thing we can teach a machine*
