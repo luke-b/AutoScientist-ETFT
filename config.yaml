@@ -1,0 +1,92 @@
+# =============================================================================
+# AutoScientist-ETFT — Centralized Runtime Configuration
+# Values here are defaults; override via environment variables or --config CLI.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# LLM Backend
+# ---------------------------------------------------------------------------
+llm:
+  backend: "openai"          # "openai" | "anthropic" | "local"
+  openai_model: "gpt-4o"
+  anthropic_model: "claude-3-5-sonnet-20241022"
+  local_base_url: "http://localhost:11434/v1"
+  local_model: "llama3"
+  temperature: 0.2
+  max_tokens: 4096
+  max_retries: 3
+  retry_wait_seconds: 5
+
+# ---------------------------------------------------------------------------
+# Data Paths
+# ---------------------------------------------------------------------------
+data:
+  root: "./data"
+  d_gen: "./data/d_gen"
+  d_rationale: "./data/d_rationale"
+  d_perf: "./data/d_perf"
+  trajectories: "./data/trajectories"
+
+# ---------------------------------------------------------------------------
+# Corpus / Regression Pipeline
+# ---------------------------------------------------------------------------
+corpus:
+  regression_pipeline:
+    max_regression_depth: 10        # Maximum number of de-optimisation steps per trajectory
+    validation_timeout_seconds: 60  # Timeout for CI/CD code validation
+    max_code_size_bytes: 524288     # 512 KB hard limit per generated file
+  performance_estimator:
+    test_size: 0.2
+    random_state: 42
+    n_estimators: 200               # RandomForest trees
+
+# ---------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------
+analysis:
+  pareto_delta:
+    pareto_threshold: 0.80          # 80% cumulative contribution threshold
+    min_delta_lines: 5              # Ignore deltas smaller than N lines
+
+# ---------------------------------------------------------------------------
+# Agents
+# ---------------------------------------------------------------------------
+agents:
+  literature:
+    max_papers: 10                  # Papers retrieved per research query
+    chunk_size_tokens: 512
+    chunk_overlap_tokens: 64
+    arxiv_max_results: 20
+  empirical:
+    experiment_timeout_seconds: 120
+    max_script_size_bytes: 65536    # 64 KB hard limit on generated scripts
+    allowed_packages:               # Whitelist for auto-installed packages
+      - numpy
+      - scipy
+      - torch
+      - sklearn
+
+# ---------------------------------------------------------------------------
+# Synthesis
+# ---------------------------------------------------------------------------
+synthesis:
+  triage:
+    risk_threshold: 0.7             # Reject candidates with P(fail) > threshold
+  sota_plus_one:
+    max_candidates: 3               # Generate N candidates and pick the best
+
+# ---------------------------------------------------------------------------
+# Fine-tuning
+# ---------------------------------------------------------------------------
+training:
+  base_model: "meta-llama/Meta-Llama-3-8B"
+  output_dir: "./checkpoints"
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  fp16: true
+  dataset_path: "./data"
