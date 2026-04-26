@@ -22,9 +22,12 @@ from corpus.regression_pipeline.schemas import (
     TrajectoryPair,
     TrajectoryStep,
 )
-from etft.llm import LLMClient
+from etft.agent import AgentClient
+from etft.skills.code_skills import SyntaxCheckSkill, ValidateCodeSkill
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILLS = [ValidateCodeSkill(), SyntaxCheckSkill()]
 
 _RATIONALE_SYSTEM = (
     "You are an expert in machine learning architecture design. "
@@ -67,7 +70,7 @@ class DatasetBuilder:
     def __init__(self, cfg: dict | None = None) -> None:
         self._cfg = cfg or {}
         self._validator = CICDValidator(cfg)
-        self._llm = LLMClient(cfg)
+        self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
 
     # ------------------------------------------------------------------
     def build_from_trajectory(
@@ -140,9 +143,18 @@ class DatasetBuilder:
 
     # ------------------------------------------------------------------
     def _generate_rationale(self, before_code: str, after_code: str) -> dict:
-        prompt = _RATIONALE_TEMPLATE.format(before=before_code, after=after_code)
-        raw = self._llm.complete(prompt, system=_RATIONALE_SYSTEM)
-        return _parse_rationale_json(raw)
+        task = (
+            "Analyse the two algorithm versions (BEFORE and AFTER) and explain what "
+            "changed and why the newer version is better. Respond in JSON with this schema: "
+            '{"delta_summary": "<string>", "changed_components": ["<component1>", ...], '
+            '"performance_impact": <float 0-1>}'
+        )
+        result = self._agent.run_task(
+            task=task,
+            context={"before_code": before_code, "after_code": after_code},
+            system=_RATIONALE_SYSTEM,
+        )
+        return _parse_rationale_json(result.output)
 
 
 # ---------------------------------------------------------------------------

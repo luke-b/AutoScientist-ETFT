@@ -14,9 +14,13 @@ import re
 import uuid
 
 from corpus.regression_pipeline.schemas import ResearchBrief, SOTAPlusOneCandidate
-from etft.llm import LLMClient
+from etft.agent import AgentClient
+from etft.skills.code_skills import ValidateCodeSkill
+from etft.skills.filter_skills import TriageCandidateSkill
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILLS = [ValidateCodeSkill(), TriageCandidateSkill()]
 
 _SYSTEM = (
     "You are an elite ML researcher and software engineer. "
@@ -72,7 +76,7 @@ class SOTAPlusOneSynthesizer:
     """Generates SOTA+1 candidates by fusing trajectory context with ARL outputs."""
 
     def __init__(self, cfg: dict | None = None) -> None:
-        self._llm = LLMClient(cfg)
+        self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
         synth_cfg = (cfg or {}).get("synthesis", {}).get("sota_plus_one", {})
         self.max_candidates: int = int(synth_cfg.get("max_candidates", 3))
 
@@ -102,20 +106,29 @@ class SOTAPlusOneSynthesizer:
             MetricsCollector.to_dict() output (or None).
         """
         emp_text = _format_empirical(empirical_summary)
-        prompt = _TEMPLATE.format(
-            sota_code=sota_code[:3000],  # cap to stay within context
-            bottleneck=bottleneck,
-            synthesis=brief.synthesis,
-            empirical_summary=emp_text,
-        )
 
         candidates: list[SOTAPlusOneCandidate] = []
         for i in range(self.max_candidates):
             logger.info(
                 "Generating SOTA+1 candidate %d / %d …", i + 1, self.max_candidates
             )
-            raw = self._llm.complete(prompt, system=_SYSTEM)
-            code, rationale = _extract_code_and_rationale(raw)
+            task = (
+                "Propose SOTA+1: an improved Python algorithm that addresses the bottleneck, "
+                "incorporates the literature findings, and is consistent with the empirical "
+                "evidence. Return:\nIMPLEMENTATION:\n```python\n<code here>\n```\n\n"
+                "RATIONALE:\n<explanation here>"
+            )
+            result = self._agent.run_task(
+                task=task,
+                context={
+                    "sota_code": sota_code[:3000],
+                    "bottleneck": bottleneck,
+                    "literature_synthesis": brief.synthesis,
+                    "empirical_summary": emp_text,
+                },
+                system=_SYSTEM,
+            )
+            code, rationale = _extract_code_and_rationale(result.output)
 
             if not code:
                 logger.warning("Candidate %d produced no code block — skipping.", i + 1)

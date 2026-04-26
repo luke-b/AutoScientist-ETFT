@@ -51,11 +51,16 @@ def _make_brief() -> ResearchBrief:
 
 
 def test_synthesizer_generates_candidates():
+    from etft.skills.base import AgentResult
+
     synth = SOTAPlusOneSynthesizer.__new__(SOTAPlusOneSynthesizer)
     synth.max_candidates = 2
-    synth._llm = MagicMock()
-    synth._llm.complete.return_value = (
-        "IMPLEMENTATION:\n```python\ndef model(): pass\n```\n\nRATIONALE:\nAdded dropout."
+    synth._agent = MagicMock()
+    synth._agent.run_task.return_value = AgentResult(
+        output="IMPLEMENTATION:\n```python\ndef model(): pass\n```\n\nRATIONALE:\nAdded dropout.",
+        steps=[],
+        skills_invoked=[],
+        success=True,
     )
 
     candidates = synth.generate(
@@ -67,14 +72,21 @@ def test_synthesizer_generates_candidates():
 
     assert len(candidates) == 2
     assert all(c.triage_passed for c in candidates)  # default risk = 0.0
-    assert synth._llm.complete.call_count == 2
+    assert synth._agent.run_task.call_count == 2
 
 
 def test_synthesizer_skips_empty_code():
+    from etft.skills.base import AgentResult
+
     synth = SOTAPlusOneSynthesizer.__new__(SOTAPlusOneSynthesizer)
     synth.max_candidates = 1
-    synth._llm = MagicMock()
-    synth._llm.complete.return_value = "No code here."
+    synth._agent = MagicMock()
+    synth._agent.run_task.return_value = AgentResult(
+        output="No code here.",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
 
     candidates = synth.generate("def x(): pass", "t1", "x", _make_brief())
     assert candidates == []

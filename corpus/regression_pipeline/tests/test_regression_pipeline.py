@@ -129,12 +129,19 @@ def test_extract_code_without_fence():
 
 
 def test_regression_agent_calls_llm():
+    from etft.skills.base import AgentResult
+
     agent = RegressionAgent.__new__(RegressionAgent)
-    agent._llm = MagicMock()
-    agent._llm.complete.return_value = "```python\ndef simple(): pass\n```"
+    agent._agent = MagicMock()
+    agent._agent.run_task.return_value = AgentResult(
+        output="```python\ndef simple(): pass\n```",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
     result = agent.regress("def complex(): pass", "cnn", 0.9)
     assert "simple" in result
-    agent._llm.complete.assert_called_once()
+    agent._agent.run_task.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +150,8 @@ def test_regression_agent_calls_llm():
 
 
 def test_dataset_builder_writes_jsonl(tmp_path):
+    from etft.skills.base import AgentResult
+
     steps = [
         TrajectoryStep(
             step_index=i,
@@ -161,11 +170,14 @@ def test_dataset_builder_writes_jsonl(tmp_path):
     mock_validator.validate.return_value = MagicMock(passed=True)
     builder._validator = mock_validator
 
-    mock_llm = MagicMock()
-    mock_llm.complete.return_value = (
-        '{"delta_summary": "added x", "changed_components": ["x"], "performance_impact": 0.1}'
+    mock_agent = MagicMock()
+    mock_agent.run_task.return_value = AgentResult(
+        output='{"delta_summary": "added x", "changed_components": ["x"], "performance_impact": 0.1}',
+        steps=[],
+        skills_invoked=[],
+        success=True,
     )
-    builder._llm = mock_llm
+    builder._agent = mock_agent
 
     d_gen_path, d_rationale_path = builder.build_from_trajectory(steps, tmp_path, trajectory_id="tid1")
 

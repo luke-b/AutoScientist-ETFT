@@ -39,19 +39,26 @@ def test_extract_code_plain():
 
 
 def test_designer_calls_proxy():
+    from etft.skills.base import AgentResult
+
     designer = ExperimentDesigner.__new__(ExperimentDesigner)
-    designer._llm = MagicMock()
-    designer._llm.complete.return_value = "```python\nprint('METRIC: acc=0.9')\n```"
+    designer._agent = MagicMock()
+    designer._agent.run_task.return_value = AgentResult(
+        output="```python\nprint('METRIC: acc=0.9')\n```",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
     designer.max_script_size = 65536
 
     script = designer.design(_make_brief(), hypothesis_index=0)
     assert "METRIC" in script
-    designer._llm.complete.assert_called_once()
+    designer._agent.run_task.assert_called_once()
 
 
 def test_designer_no_hypotheses_raises():
     designer = ExperimentDesigner.__new__(ExperimentDesigner)
-    designer._llm = MagicMock()
+    designer._agent = MagicMock()
     designer.max_script_size = 65536
     empty_brief = ResearchBrief(
         bottleneck="x", query="q", synthesis="s", hypotheses=[]

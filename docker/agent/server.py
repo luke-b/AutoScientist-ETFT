@@ -88,26 +88,116 @@ class _Backend:
 
         logger.info("Proxy LLM backend: %s / %s", self.backend, self.model)
 
-    def complete(self, messages: list[dict[str, str]]) -> str:
+    def complete(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict:
+        """
+        Call the provider and return a response dict in OpenAI message format:
+        ``{"content": str, "tool_calls": list | None, "finish_reason": str}``
+        """
         if self.backend == "anthropic":
-            system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            user_msgs = [m for m in messages if m["role"] != "system"]
-            resp = self._client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=system or "You are an expert coding agent.",
-                messages=user_msgs,
-            )
-            return resp.content[0].text
+            return self._complete_anthropic(messages, tools)
 
-        # OpenAI-compatible
-        resp = self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.2,
-            max_tokens=4096,
-        )
-        return resp.choices[0].message.content or ""
+        # OpenAI-compatible (openai + local)
+        return self._complete_openai(messages, tools)
+
+    def _complete_openai(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict:
+        kwargs: dict = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 4096,
+        }
+        if tools:
+            kwargs["tools"] = tools
+
+        resp = self._client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+        msg = choice.message
+
+        tool_calls = None
+        if getattr(msg, "tool_calls", None):
+            tool_calls = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in msg.tool_calls
+            ]
+
+        return {
+            "content": msg.content or "",
+            "tool_calls": tool_calls,
+            "finish_reason": choice.finish_reason or "stop",
+        }
+
+    def _complete_anthropic(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict:
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        user_msgs = [m for m in messages if m["role"] != "system"]
+
+        kwargs: dict = {
+            "model": self.model,
+            "max_tokens": 4096,
+            "system": system or "You are an expert coding agent.",
+            "messages": user_msgs,
+        }
+
+        if tools:
+            # Convert OpenAI tool format to Anthropic tool format
+            anthropic_tools = []
+            for t in tools:
+                func = t.get("function", {})
+                anthropic_tools.append(
+                    {
+                        "name": func.get("name", ""),
+                        "description": func.get("description", ""),
+                        "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+                    }
+                )
+            kwargs["tools"] = anthropic_tools
+
+        resp = self._client.messages.create(**kwargs)
+
+        content_text = ""
+        tool_calls = None
+
+        for block in resp.content:
+            if block.type == "text":
+                content_text += block.text
+            elif block.type == "tool_use":
+                if tool_calls is None:
+                    tool_calls = []
+                tool_calls.append(
+                    {
+                        "id": block.id,
+                        "type": "function",
+                        "function": {
+                            "name": block.name,
+                            "arguments": __import__("json").dumps(block.input),
+                        },
+                    }
+                )
+
+        finish_reason = "tool_calls" if tool_calls else "stop"
+        return {
+            "content": content_text,
+            "tool_calls": tool_calls,
+            "finish_reason": finish_reason,
+        }
 
 
 _backend = _Backend()
@@ -119,13 +209,16 @@ _backend = _Backend()
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: str | None = None
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
 
 
 class CompletionRequest(BaseModel):
     messages: list[ChatMessage]
     temperature: float = 0.2
     max_tokens: int = 4096
+    tools: list[dict] | None = None
 
 
 class CompletionChoice(BaseModel):
@@ -155,15 +248,26 @@ def health() -> dict[str, str]:
     dependencies=[Depends(_verify_token)],
 )
 def chat_completions(req: CompletionRequest) -> CompletionResponse:
-    messages = [m.model_dump() for m in req.messages]
-    logger.info("Completion request | messages=%d", len(messages))
+    messages = [m.model_dump(exclude_none=True) for m in req.messages]
+    logger.info("Completion request | messages=%d tools=%s", len(messages), bool(req.tools))
     try:
-        content = _backend.complete(messages)
+        result = _backend.complete(messages, tools=req.tools or None)
     except Exception as exc:
         logger.exception("LLM backend error: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    response_message = ChatMessage(
+        role="assistant",
+        content=result["content"] or None,
+        tool_calls=result.get("tool_calls"),
+    )
     return CompletionResponse(
-        choices=[CompletionChoice(message=ChatMessage(role="assistant", content=content))]
+        choices=[
+            CompletionChoice(
+                message=response_message,
+                finish_reason=result.get("finish_reason", "stop"),
+            )
+        ]
     )
 
 

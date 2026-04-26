@@ -30,6 +30,7 @@ Usage
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -112,6 +113,77 @@ class LLMClient:
         data = response.json()
         try:
             return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Unexpected proxy response format: {data}") from exc
+
+    # ------------------------------------------------------------------
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        reraise=True,
+    )
+    def complete_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> "LLMResponse":
+        """
+        Send *messages* to the proxy, optionally with tool definitions.
+
+        Returns
+        -------
+        LLMResponse
+            Parsed response with content, tool_calls, and finish_reason.
+        """
+        from etft.skills.base import LLMResponse, ToolCall
+
+        payload: dict[str, Any] = {"messages": messages}
+        if tools:
+            payload["tools"] = tools
+
+        logger.debug(
+            "Proxy request (with_tools=%s) → %s%s",
+            bool(tools),
+            self._url,
+            _COMPLETIONS_PATH,
+        )
+
+        with httpx.Client(timeout=self._timeout) as client:
+            response = client.post(
+                f"{self._url}{_COMPLETIONS_PATH}",
+                json=payload,
+                headers=self._headers,
+            )
+            response.raise_for_status()
+
+        data = response.json()
+        try:
+            choice = data["choices"][0]
+            message = choice["message"]
+            finish_reason: str = choice.get("finish_reason", "stop")
+            content: str = message.get("content") or ""
+
+            tool_calls: list[ToolCall] = []
+            for tc in message.get("tool_calls") or []:
+                func = tc.get("function", {})
+                raw_args = func.get("arguments", "{}")
+                try:
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                except json.JSONDecodeError:
+                    args = {}
+                tool_calls.append(
+                    ToolCall(
+                        id=tc.get("id", ""),
+                        name=func.get("name", ""),
+                        args=args,
+                    )
+                )
+
+            return LLMResponse(
+                content=content,
+                tool_calls=tool_calls,
+                finish_reason=finish_reason,
+            )
         except (KeyError, IndexError) as exc:
             raise ValueError(f"Unexpected proxy response format: {data}") from exc
 

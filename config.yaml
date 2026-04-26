@@ -4,6 +4,13 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
+# Agent (ReAct loop)
+# ---------------------------------------------------------------------------
+agent:
+  max_steps: 10
+  system_prompt: "You are an expert ML researcher and software engineer with access to ETFT tools."
+
+# ---------------------------------------------------------------------------
 # Coding-Agent Proxy
 # All LLM traffic is routed through a coding-agent proxy container.
 # The container can run locally (Docker) or be a remote cloud endpoint.

@@ -11,9 +11,12 @@ from __future__ import annotations
 import logging
 import re
 
-from etft.llm import LLMClient
+from etft.agent import AgentClient
+from etft.skills.code_skills import SyntaxCheckSkill, ValidateCodeSkill
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILLS = [ValidateCodeSkill(), SyntaxCheckSkill()]
 
 _SYSTEM_PROMPT = """You are an expert software engineer and machine learning researcher.
 Your task is to reverse-engineer a given algorithm into a simpler, earlier version of itself.
@@ -48,10 +51,10 @@ def _extract_code(text: str) -> str:
 
 
 class RegressionAgent:
-    """Wraps an LLM to de-optimise one algorithm step."""
+    """Wraps an LLM agent to de-optimise one algorithm step."""
 
     def __init__(self, cfg: dict | None = None) -> None:
-        self._llm = LLMClient(cfg)
+        self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
 
     def regress(self, code: str, algorithm_family: str, fitness: float) -> str:
         """
@@ -71,9 +74,21 @@ class RegressionAgent:
         str
             Source code of the proposed predecessor algorithm.
         """
-        prompt = _USER_TEMPLATE.format(family=algorithm_family, fitness=fitness, code=code)
-        logger.info("Calling regression agent for family=%s fitness=%.4f", algorithm_family, fitness)
-        raw = self._llm.complete(prompt, system=_SYSTEM_PROMPT)
-        predecessor_code = _extract_code(raw)
+        task = (
+            f"Produce a valid Python predecessor of the given algorithm that is simpler and "
+            f"less optimised. The algorithm family is '{algorithm_family}' with fitness "
+            f"{fitness:.4f}. The predecessor must solve the same problem, be syntactically "
+            f"valid Python, and be measurably simpler. Respond with ONLY the Python source "
+            f"code, enclosed in ```python ... ``` fences."
+        )
+        logger.info(
+            "Calling regression agent for family=%s fitness=%.4f", algorithm_family, fitness
+        )
+        result = self._agent.run_task(
+            task=task,
+            context={"current_code": code, "system_instructions": _SYSTEM_PROMPT},
+            system=_SYSTEM_PROMPT,
+        )
+        predecessor_code = _extract_code(result.output)
         logger.debug("Predecessor code length: %d chars", len(predecessor_code))
         return predecessor_code

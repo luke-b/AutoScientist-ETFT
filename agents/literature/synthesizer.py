@@ -9,9 +9,12 @@ import logging
 
 from agents.literature.retriever import Chunk
 from corpus.regression_pipeline.schemas import ResearchBrief
-from etft.llm import LLMClient
+from etft.agent import AgentClient
+from etft.skills.literature_skills import FetchAndChunkPapersSkill, SearchArxivSkill
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILLS = [SearchArxivSkill(), FetchAndChunkPapersSkill()]
 
 _SYSTEM = (
     "You are a world-class ML research assistant. "
@@ -63,7 +66,7 @@ class LiteratureSynthesizer:
     """Calls the coding-agent proxy to synthesise literature into a ResearchBrief."""
 
     def __init__(self, cfg: dict | None = None) -> None:
-        self._llm = LLMClient(cfg)
+        self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
 
     # ------------------------------------------------------------------
     def synthesize(
@@ -93,11 +96,20 @@ class LiteratureSynthesizer:
         if len(combined) > 4000:
             combined = combined[:4000] + "\n... [truncated]"
 
-        prompt = _TEMPLATE.format(bottleneck=bottleneck, query=query, excerpts=combined)
+        task = (
+            f"Synthesise the provided literature excerpts for the bottleneck "
+            f"'{bottleneck}' (query: '{query}'). Write a 3-5 sentence synthesis and list "
+            f"2-5 concrete hypotheses for addressing the bottleneck.\n\n"
+            f"Respond in this exact format:\nSYNTHESIS:\n<your synthesis here>\n\n"
+            f"HYPOTHESES:\n- <hypothesis 1>\n- <hypothesis 2>\n..."
+        )
         logger.info("Synthesising %d chunks for bottleneck=%r", len(chunks), bottleneck)
-        raw = self._llm.complete(prompt, system=_SYSTEM)
-
-        synthesis, hypotheses = _parse_response(raw)
+        result = self._agent.run_task(
+            task=task,
+            context={"excerpts": combined},
+            system=_SYSTEM,
+        )
+        synthesis, hypotheses = _parse_response(result.output)
 
         paper_dicts = []
         if papers:

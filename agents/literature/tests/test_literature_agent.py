@@ -110,10 +110,15 @@ def test_parse_response_malformed():
 
 
 def test_synthesizer_calls_proxy():
+    from etft.skills.base import AgentResult
+
     synth = LiteratureSynthesizer.__new__(LiteratureSynthesizer)
-    synth._llm = MagicMock()
-    synth._llm.complete.return_value = (
-        "SYNTHESIS:\nKey finding.\n\nHYPOTHESES:\n- Hypothesis A."
+    synth._agent = MagicMock()
+    synth._agent.run_task.return_value = AgentResult(
+        output="SYNTHESIS:\nKey finding.\n\nHYPOTHESES:\n- Hypothesis A.",
+        steps=[],
+        skills_invoked=[],
+        success=True,
     )
 
     from agents.literature.retriever import Chunk
@@ -124,4 +129,4 @@ def test_synthesizer_calls_proxy():
     assert brief.bottleneck == "batch_normalisation"
     assert "Key finding" in brief.synthesis
     assert len(brief.hypotheses) == 1
-    synth._llm.complete.assert_called_once()
+    synth._agent.run_task.assert_called_once()

@@ -12,9 +12,13 @@ import logging
 import re
 
 from corpus.regression_pipeline.schemas import ResearchBrief
-from etft.llm import LLMClient
+from etft.agent import AgentClient
+from etft.skills.code_skills import ParseMetricsSkill, ValidateCodeSkill
+from etft.skills.experiment_skills import RunExperimentSkill
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILLS = [ValidateCodeSkill(), RunExperimentSkill(), ParseMetricsSkill()]
 
 _SYSTEM = (
     "You are an expert ML engineer. "
@@ -51,7 +55,7 @@ class ExperimentDesigner:
     """Generates runnable micro-experiment scripts from a ResearchBrief."""
 
     def __init__(self, cfg: dict | None = None) -> None:
-        self._llm = LLMClient(cfg)
+        self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
         emp_cfg = (cfg or {}).get("agents", {}).get("empirical", {})
         self.max_script_size: int = int(emp_cfg.get("max_script_size_bytes", 65536))
 
@@ -73,16 +77,25 @@ class ExperimentDesigner:
         target = hypotheses[idx]
 
         hypothesis_list = "\n".join(f"  {i+1}. {h}" for i, h in enumerate(hypotheses))
-        prompt = _TEMPLATE.format(
-            bottleneck=brief.bottleneck,
-            synthesis=brief.synthesis,
-            hypotheses=hypothesis_list,
-            target_hypothesis=target,
+        task = (
+            f"Write a self-contained Python micro-experiment script that validates this "
+            f"hypothesis: '{target}'. The script must run in under 2 minutes on CPU, print "
+            f"'METRIC: <name>=<value>' for each metric, use only whitelisted packages "
+            f"(numpy, scipy, sklearn, torch CPU only), and use synthetic data only. "
+            f"Respond with ONLY the Python source code in ```python ... ``` fences."
         )
 
         logger.info("Designing experiment for hypothesis: %r", target)
-        raw = self._llm.complete(prompt, system=_SYSTEM)
-        script = _extract_code(raw)
+        result = self._agent.run_task(
+            task=task,
+            context={
+                "bottleneck": brief.bottleneck,
+                "synthesis": brief.synthesis,
+                "all_hypotheses": hypothesis_list,
+            },
+            system=_SYSTEM,
+        )
+        script = _extract_code(result.output)
 
         if len(script.encode()) > self.max_script_size:
             logger.warning("Generated script exceeds max size; truncating.")
