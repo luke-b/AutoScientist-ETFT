@@ -1,0 +1,8 @@
+# Minimal dependencies for the proxy server image
+fastapi>=0.111
+uvicorn[standard]>=0.29
+pydantic>=2.0
+# LLM provider SDKs (all included; only one is used at runtime)
+openai>=1.0
+anthropic>=0.20
+tenacity>=8.3

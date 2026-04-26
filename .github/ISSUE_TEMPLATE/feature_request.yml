@@ -1,0 +1,54 @@
+name: Feature Request
+description: Suggest a new feature or improvement for AutoScientist-ETFT
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We welcome feature requests!  Please describe the problem you're trying
+        to solve and your proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this feature solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like this to work?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - corpus/regression_pipeline
+        - corpus/performance_estimator
+        - agents/literature
+        - agents/empirical
+        - analysis/pareto_delta
+        - synthesis/sota_plus_one
+        - feedback/rl_loop
+        - docker/agent (proxy container)
+        - train.py (fine-tuning)
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches you've considered.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

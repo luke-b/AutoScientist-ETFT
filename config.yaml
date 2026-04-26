@@ -1,0 +1,113 @@
+# =============================================================================
+# AutoScientist-ETFT — Centralized Runtime Configuration
+# Values here are defaults; override via environment variables or --config CLI.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Agent (ReAct loop)
+# ---------------------------------------------------------------------------
+agent:
+  max_steps: 10
+  system_prompt: "You are an expert ML researcher and software engineer with access to ETFT tools."
+
+# ---------------------------------------------------------------------------
+# Coding-Agent Proxy
+# All LLM traffic is routed through a coding-agent proxy container.
+# The container can run locally (Docker) or be a remote cloud endpoint.
+# ---------------------------------------------------------------------------
+agent_proxy:
+  url: "http://localhost:8080"      # Override with AGENT_PROXY_URL env var
+  token: ""                          # Override with AGENT_PROXY_TOKEN env var
+  timeout_seconds: 120
+  max_retries: 3
+  retry_wait_seconds: 5
+
+  # Local Docker container settings (used when mode = "local")
+  container:
+    mode: "local"                    # "local" | "cloud"
+    image: "autoscientist-etft-agent:latest"
+    name: "etft-agent-proxy"
+    port: 8080
+    # Resource limits for the lightweight container
+    mem_limit: "2g"
+    cpu_count: 2
+    # The proxy server's own LLM backend (set in container env)
+    proxy_llm_backend: "openai"
+    proxy_llm_model: "gpt-4o"
+
+# ---------------------------------------------------------------------------
+# Data Paths
+# ---------------------------------------------------------------------------
+data:
+  root: "./data"
+  d_gen: "./data/d_gen"
+  d_rationale: "./data/d_rationale"
+  d_perf: "./data/d_perf"
+  trajectories: "./data/trajectories"
+
+# ---------------------------------------------------------------------------
+# Corpus / Regression Pipeline
+# ---------------------------------------------------------------------------
+corpus:
+  regression_pipeline:
+    max_regression_depth: 10        # Maximum number of de-optimisation steps per trajectory
+    validation_timeout_seconds: 60  # Timeout for CI/CD code validation
+    max_code_size_bytes: 524288     # 512 KB hard limit per generated file
+  performance_estimator:
+    test_size: 0.2
+    random_state: 42
+    n_estimators: 200               # RandomForest trees
+
+# ---------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------
+analysis:
+  pareto_delta:
+    pareto_threshold: 0.80          # 80% cumulative contribution threshold
+    min_delta_lines: 5              # Ignore deltas smaller than N lines
+
+# ---------------------------------------------------------------------------
+# Agents
+# ---------------------------------------------------------------------------
+agents:
+  literature:
+    max_papers: 10                  # Papers retrieved per research query
+    chunk_size_tokens: 512
+    chunk_overlap_tokens: 64
+    arxiv_max_results: 20
+  empirical:
+    experiment_timeout_seconds: 120
+    max_script_size_bytes: 65536    # 64 KB hard limit on generated scripts
+    allowed_packages:               # Whitelist for auto-installed packages
+      - numpy
+      - scipy
+      - torch
+      - sklearn
+
+# ---------------------------------------------------------------------------
+# Synthesis
+# ---------------------------------------------------------------------------
+synthesis:
+  triage:
+    risk_threshold: 0.7             # Reject candidates with P(fail) > threshold
+  sota_plus_one:
+    max_candidates: 3               # Generate N candidates and pick the best
+
+# ---------------------------------------------------------------------------
+# Fine-tuning
+# ---------------------------------------------------------------------------
+training:
+  # HuggingFace PEFT/LoRA path
+  base_model: "meta-llama/Meta-Llama-3-8B"
+  output_dir: "./checkpoints"
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  fp16: true
+  dataset_path: "./data"
+  # OpenAI fine-tune path (alternative)
+  openai_finetune_model: "gpt-3.5-turbo"
