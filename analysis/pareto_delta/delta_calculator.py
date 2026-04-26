@@ -94,8 +94,8 @@ class DeltaCalculator:
                 tofile=f"step_{after.step_index}",
             )
         )
-        added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
-        removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+        added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+        removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
 
         if added + removed < self.min_delta_lines:
             return None

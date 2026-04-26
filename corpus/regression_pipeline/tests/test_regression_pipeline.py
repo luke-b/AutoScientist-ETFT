@@ -83,7 +83,6 @@ class TestCICDValidator:
 
     def test_timeout(self, monkeypatch):
         import subprocess
-        original = subprocess.run
 
         def fake_run(*args, **kwargs):
             raise subprocess.TimeoutExpired(cmd=args[0], timeout=1)

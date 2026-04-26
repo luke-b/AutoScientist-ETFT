@@ -69,7 +69,7 @@ class _Extractor(ast.NodeVisitor):
         self.generic_visit(node)
         self._exit_block()
 
-    visit_AsyncFunctionDef = visit_FunctionDef
+    visit_AsyncFunctionDef = visit_FunctionDef  # noqa: N815
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._num_classes += 1
@@ -83,8 +83,8 @@ class _Extractor(ast.NodeVisitor):
         self.generic_visit(node)
         self._exit_block()
 
-    visit_While = visit_For
-    visit_AsyncFor = visit_For
+    visit_While = visit_For  # noqa: N815
+    visit_AsyncFor = visit_For  # noqa: N815
 
     def visit_Import(self, node: ast.Import) -> None:
         self._num_imports += len(node.names)
@@ -98,8 +98,8 @@ class _Extractor(ast.NodeVisitor):
         self._num_assignments += 1
         self.generic_visit(node)
 
-    visit_AugAssign = visit_Assign
-    visit_AnnAssign = visit_Assign
+    visit_AugAssign = visit_Assign  # noqa: N815
+    visit_AnnAssign = visit_Assign  # noqa: N815
 
     def visit_Call(self, node: ast.Call) -> None:
         self._num_calls += 1
@@ -119,9 +119,9 @@ class _Extractor(ast.NodeVisitor):
         self._num_comprehensions += 1
         self.generic_visit(node)
 
-    visit_SetComp = visit_ListComp
-    visit_DictComp = visit_ListComp
-    visit_GeneratorExp = visit_ListComp
+    visit_SetComp = visit_ListComp  # noqa: N815
+    visit_DictComp = visit_ListComp  # noqa: N815
+    visit_GeneratorExp = visit_ListComp  # noqa: N815
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         self._num_lambda += 1
@@ -131,7 +131,7 @@ class _Extractor(ast.NodeVisitor):
         self._num_yield += 1
         self.generic_visit(node)
 
-    visit_YieldFrom = visit_Yield
+    visit_YieldFrom = visit_Yield  # noqa: N815
 
     # --- helpers ---
 

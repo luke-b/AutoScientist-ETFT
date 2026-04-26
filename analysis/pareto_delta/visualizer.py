@@ -46,7 +46,6 @@ def plot_pareto_bar(
     """Pareto bar chart with a cumulative contribution line."""
     try:
         import matplotlib.pyplot as plt
-        import numpy as np
     except ImportError as exc:
         raise ImportError("Install matplotlib: pip install 'autoscientist-etft[viz]'") from exc
 
@@ -57,7 +56,7 @@ def plot_pareto_bar(
     fig, ax1 = plt.subplots(figsize=(max(6, len(component_names) * 0.8), 5))
     x = range(len(component_names))
 
-    bars = ax1.bar(x, fractions, color="#dbeafe", edgecolor="#2563eb")
+    ax1.bar(x, fractions, color="#dbeafe", edgecolor="#2563eb")
     ax1.set_xticks(list(x))
     ax1.set_xticklabels(component_names, rotation=30, ha="right")
     ax1.set_ylabel("Fractional Contribution")

@@ -82,7 +82,7 @@ class ExperimentRunner:
                 text=True,
                 timeout=self.timeout,
             )
-            duration = time.perf_counter() - start
+            _duration = time.perf_counter() - start
 
             if proc.returncode != 0:
                 return ExperimentResult(

@@ -71,7 +71,7 @@ class ProbabilisticFilter:
 
         features = extract_features(code)
         names = feature_names()
-        X = np.array([[features.get(n, 0.0) for n in names]])
+        X = np.array([[features.get(n, 0.0) for n in names]])  # noqa: N806
 
         try:
             proba = self._model.predict_proba(X)

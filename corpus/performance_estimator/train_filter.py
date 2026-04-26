@@ -51,10 +51,10 @@ def train(data_dir: Path, output_path: Path, cfg: dict | None = None) -> None:
         )
 
     names = feature_names()
-    X = np.array([[s.features.get(n, 0.0) for n in names] for s in samples])
+    X = np.array([[s.features.get(n, 0.0) for n in names] for s in samples])  # noqa: N806
     y = np.array([s.label for s in samples])
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_train, X_test, y_train, y_test = train_test_split(  # noqa: N806
         X, y, test_size=test_size, random_state=random_state, stratify=y
     )
 
