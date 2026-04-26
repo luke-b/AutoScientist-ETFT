@@ -44,7 +44,8 @@ def feature_names() -> list[str]:
 
 
 class _Extractor(ast.NodeVisitor):
-    def __init__(self) -> None:
+    def __init__(self, code_chars: int = 0) -> None:
+        self._code_chars = code_chars
         self._num_functions = 0
         self._num_classes = 0
         self._num_loops = 0
@@ -55,8 +56,6 @@ class _Extractor(ast.NodeVisitor):
         self._num_decorators = 0
         self._max_nesting = 0
         self._current_nesting = 0
-        self._total_lines = 0
-        self._total_chars = 0
         self._num_try_except = 0
         self._num_comprehensions = 0
         self._num_lambda = 0
@@ -148,7 +147,6 @@ class _Extractor(ast.NodeVisitor):
     # --- output ---
 
     def features(self) -> dict[str, float]:
-        n_lines = max(1, self._total_lines)
         return {
             "num_functions": float(self._num_functions),
             "num_classes": float(self._num_classes),
@@ -163,11 +161,11 @@ class _Extractor(ast.NodeVisitor):
             "num_comprehensions": float(self._num_comprehensions),
             "num_lambda": float(self._num_lambda),
             "num_yield": float(self._num_yield),
-            "code_length_chars": float(len("".join(str(n) for n in ast.walk(ast.parse(""))))),
+            "code_length_chars": float(self._code_chars),
             "calls_per_function": (
                 self._num_calls / self._num_functions if self._num_functions else 0.0
             ),
-            "log_code_chars": math.log1p(self._total_chars),
+            "log_code_chars": math.log1p(self._code_chars),
         }
 
 
@@ -192,14 +190,4 @@ def _zero_features() -> dict[str, float]:
     }
 
 
-# Patch _Extractor.features to set _total_chars correctly
-_original_features = _Extractor.features
 
-
-def _patched_features(self: _Extractor) -> dict[str, float]:  # noqa: N802
-    d = _original_features(self)
-    d["log_code_chars"] = math.log1p(self._total_chars)
-    return d
-
-
-_Extractor.features = _patched_features  # type: ignore[method-assign]

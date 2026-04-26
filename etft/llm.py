@@ -1,8 +1,31 @@
 """
-etft/llm.py — Provider-agnostic LLM adapter.
+etft/llm.py — Coding-agent proxy client.
 
-Supports OpenAI, Anthropic, and local (OpenAI-compatible) backends.
-Configure via config.yaml or environment variables.
+All LLM traffic in AutoScientist-ETFT flows through a coding-agent proxy
+container (local Docker or cloud endpoint) rather than calling provider
+SDKs directly.  The proxy exposes an OpenAI-compatible
+POST /v1/chat/completions endpoint and handles provider credentials,
+model selection, rate-limiting, and high-level coding-agent capabilities
+internally.
+
+Architecture
+------------
+  ETFT module
+      │
+      ▼  HTTP  (X-Agent-Token header)
+  ┌──────────────────────────────┐
+  │  Coding-Agent Proxy          │  ← docker/agent/server.py
+  │  (local container or cloud)  │
+  └──────────────────────────────┘
+      │
+      ▼  provider SDK (inside container)
+  OpenAI Codex / Anthropic / local model
+
+Usage
+-----
+    from etft.llm import LLMClient
+    client = LLMClient(cfg)          # cfg from config.yaml
+    answer = client.complete(prompt, system="…")
 """
 
 from __future__ import annotations
@@ -11,52 +34,36 @@ import logging
 import os
 from typing import Any
 
+import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_PROXY_URL = "http://localhost:8080"
+_COMPLETIONS_PATH = "/v1/chat/completions"
+
 
 class LLMClient:
-    """Thin, provider-agnostic wrapper around LLM completion APIs."""
+    """
+    Sends completion requests to the coding-agent proxy container.
+
+    The proxy is responsible for all provider credentials and model routing;
+    this client only needs the proxy URL and a shared token.
+    """
 
     def __init__(self, cfg: dict | None = None) -> None:
-        self._cfg = cfg or {}
-        llm_cfg = self._cfg.get("llm", {})
-        self.backend: str = os.getenv("LLM_BACKEND", llm_cfg.get("backend", "openai"))
-        self.temperature: float = float(llm_cfg.get("temperature", 0.2))
-        self.max_tokens: int = int(llm_cfg.get("max_tokens", 4096))
-        self._client: Any = None
-        self._model: str = ""
-        self._init_client(llm_cfg)
-
-    # ------------------------------------------------------------------
-    def _init_client(self, llm_cfg: dict) -> None:
-        if self.backend == "openai":
-            import openai
-
-            self._client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            self._model = os.getenv("OPENAI_MODEL", llm_cfg.get("openai_model", "gpt-4o"))
-
-        elif self.backend == "anthropic":
-            import anthropic
-
-            self._client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            self._model = os.getenv(
-                "ANTHROPIC_MODEL",
-                llm_cfg.get("anthropic_model", "claude-3-5-sonnet-20241022"),
-            )
-
-        elif self.backend == "local":
-            import openai
-
-            base_url = os.getenv(
-                "LOCAL_LLM_BASE_URL", llm_cfg.get("local_base_url", "http://localhost:11434/v1")
-            )
-            self._client = openai.OpenAI(api_key="local", base_url=base_url)
-            self._model = os.getenv("LOCAL_LLM_MODEL", llm_cfg.get("local_model", "llama3"))
-
-        else:
-            raise ValueError(f"Unknown LLM backend: {self.backend!r}")
+        proxy_cfg = (cfg or {}).get("agent_proxy", {})
+        self._url: str = os.getenv(
+            "AGENT_PROXY_URL", proxy_cfg.get("url", _DEFAULT_PROXY_URL)
+        ).rstrip("/")
+        self._token: str = os.getenv(
+            "AGENT_PROXY_TOKEN", proxy_cfg.get("token", "")
+        )
+        self._timeout: float = float(proxy_cfg.get("timeout_seconds", 120))
+        self._headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            **({"X-Agent-Token": self._token} if self._token else {}),
+        }
 
     # ------------------------------------------------------------------
     @retry(
@@ -65,29 +72,46 @@ class LLMClient:
         reraise=True,
     )
     def complete(self, prompt: str, system: str = "") -> str:
-        """Return the model's text completion for *prompt*."""
-        logger.debug("LLM complete | backend=%s model=%s", self.backend, self._model)
+        """
+        Send *prompt* to the proxy and return the assistant's reply text.
 
-        if self.backend == "anthropic":
-            msg = self._client.messages.create(
-                model=self._model,
-                max_tokens=self.max_tokens,
-                system=system or "You are a helpful AI research assistant.",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-            )
-            return msg.content[0].text
+        Parameters
+        ----------
+        prompt:
+            User message / task description.
+        system:
+            Optional system instruction forwarded to the proxy.
 
-        # OpenAI-compatible (openai + local)
-        messages = []
+        Returns
+        -------
+        str
+            The coding agent's response text.
+
+        Raises
+        ------
+        httpx.HTTPError
+            On network failures after all retries are exhausted.
+        """
+        messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        resp = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
-        return resp.choices[0].message.content or ""
+        payload: dict[str, Any] = {"messages": messages}
+
+        logger.debug("Proxy request → %s%s", self._url, _COMPLETIONS_PATH)
+
+        with httpx.Client(timeout=self._timeout) as client:
+            response = client.post(
+                f"{self._url}{_COMPLETIONS_PATH}",
+                json=payload,
+                headers=self._headers,
+            )
+            response.raise_for_status()
+
+        data = response.json()
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Unexpected proxy response format: {data}") from exc
+

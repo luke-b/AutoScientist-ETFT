@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "copilot/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    name: Lint & Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install core + dev extras only (skip heavy ML deps for CI speed)
+          pip install pydantic pyyaml python-dotenv requests httpx tenacity \
+                      numpy scipy scikit-learn arxiv beautifulsoup4 \
+                      fastapi uvicorn \
+                      pytest pytest-cov ruff
+
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Run tests
+        run: |
+          pytest \
+            --tb=short \
+            --cov=corpus --cov=analysis --cov=agents --cov=synthesis --cov=feedback --cov=etft \
+            --cov-report=term-missing \
+            corpus/ analysis/ agents/ synthesis/ feedback/ tests/
+        env:
+          # No real proxy needed for unit tests
+          AGENT_PROXY_URL: http://localhost:8080
+          AGENT_PROXY_TOKEN: test-token
+
+  docker-build:
+    name: Build proxy Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f docker/agent/Dockerfile \
+            -t autoscientist-etft-agent:ci \
+            .

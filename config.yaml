@@ -4,18 +4,29 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# LLM Backend
+# Coding-Agent Proxy
+# All LLM traffic is routed through a coding-agent proxy container.
+# The container can run locally (Docker) or be a remote cloud endpoint.
 # ---------------------------------------------------------------------------
-llm:
-  backend: "openai"          # "openai" | "anthropic" | "local"
-  openai_model: "gpt-4o"
-  anthropic_model: "claude-3-5-sonnet-20241022"
-  local_base_url: "http://localhost:11434/v1"
-  local_model: "llama3"
-  temperature: 0.2
-  max_tokens: 4096
+agent_proxy:
+  url: "http://localhost:8080"      # Override with AGENT_PROXY_URL env var
+  token: ""                          # Override with AGENT_PROXY_TOKEN env var
+  timeout_seconds: 120
   max_retries: 3
   retry_wait_seconds: 5
+
+  # Local Docker container settings (used when mode = "local")
+  container:
+    mode: "local"                    # "local" | "cloud"
+    image: "autoscientist-etft-agent:latest"
+    name: "etft-agent-proxy"
+    port: 8080
+    # Resource limits for the lightweight container
+    mem_limit: "2g"
+    cpu_count: 2
+    # The proxy server's own LLM backend (set in container env)
+    proxy_llm_backend: "openai"
+    proxy_llm_model: "gpt-4o"
 
 # ---------------------------------------------------------------------------
 # Data Paths
@@ -79,6 +90,7 @@ synthesis:
 # Fine-tuning
 # ---------------------------------------------------------------------------
 training:
+  # HuggingFace PEFT/LoRA path
   base_model: "meta-llama/Meta-Llama-3-8B"
   output_dir: "./checkpoints"
   lora_r: 16
@@ -90,3 +102,5 @@ training:
   learning_rate: 2.0e-4
   fp16: true
   dataset_path: "./data"
+  # OpenAI fine-tune path (alternative)
+  openai_finetune_model: "gpt-3.5-turbo"

@@ -52,12 +52,14 @@ def build_dataset(data_root: Path) -> list[dict]:
     d_rat_dir = data_root / "d_rationale"
 
     for jsonl_file in sorted(d_gen_dir.glob("*.jsonl")):
-        examples.extend(_load_jsonl(jsonl_file))
-        logger.info("Loaded %d examples from %s", len(examples), jsonl_file)
+        file_records = _load_jsonl(jsonl_file)
+        examples.extend(file_records)
+        logger.info("Loaded %d examples from %s", len(file_records), jsonl_file)
 
     for jsonl_file in sorted(d_rat_dir.glob("*.jsonl")):
-        examples.extend(_load_jsonl(jsonl_file))
-        logger.info("Loaded %d examples from %s (rationale)", len(examples), jsonl_file)
+        file_records = _load_jsonl(jsonl_file)
+        examples.extend(file_records)
+        logger.info("Loaded %d examples from %s (rationale)", len(file_records), jsonl_file)
 
     return examples
 

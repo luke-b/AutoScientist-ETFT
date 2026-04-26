@@ -1,0 +1,40 @@
+# =============================================================================
+# AutoScientist-ETFT — Docker Compose
+# Runs the coding-agent proxy container locally.
+#
+# Usage:
+#   cp .env.example .env   # fill in your provider key
+#   docker compose up -d
+# =============================================================================
+
+services:
+  etft-agent-proxy:
+    build:
+      context: ..
+      dockerfile: docker/agent/Dockerfile
+    image: autoscientist-etft-agent:latest
+    container_name: etft-agent-proxy
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Proxy's own LLM backend — set ONE of the following:
+      PROXY_LLM_BACKEND: ${PROXY_LLM_BACKEND:-openai}
+      PROXY_LLM_MODEL: ${PROXY_LLM_MODEL:-gpt-4o}
+      # Provider credentials (only the relevant one needs to be set)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-}
+      # Shared token the ETFT framework sends in X-Agent-Token
+      AGENT_PROXY_TOKEN: ${AGENT_PROXY_TOKEN:-change-me-in-production}
+      PORT: "8080"
+    mem_limit: 2g
+    cpus: "2.0"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

@@ -1,0 +1,66 @@
+name: Bug Report
+description: Report a bug or unexpected behaviour in AutoScientist-ETFT
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.  Please fill in as much
+        detail as possible so we can reproduce and fix the issue quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Minimal steps to reproduce the behaviour.
+      placeholder: |
+        1. Run `python -m corpus.regression_pipeline.run --target cnn`
+        2. Observe error …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / tracebacks
+      render: shell
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version
+      placeholder: "e.g. 3.11.8"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: proxy_mode
+    attributes:
+      label: Proxy container mode
+      options:
+        - local (Docker)
+        - cloud
+        - not applicable
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config.yaml sections
+      render: yaml
