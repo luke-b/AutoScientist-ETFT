@@ -232,12 +232,11 @@ def test_fitness_evaluator_in_regression_pipeline(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_vector_store_cache_hit(tmp_path: Path) -> None:
-    """LiteratureRetriever skips fetch for already-cached papers."""
+def test_vector_store_cache_hit(any_vector_store) -> None:
+    """LiteratureRetriever skips fetch for already-cached papers (both backends)."""
     from agents.literature.retriever import Chunk, LiteratureRetriever
-    from agents.literature.vector_store import InMemoryVectorStore
 
-    store = InMemoryVectorStore()
+    store = any_vector_store
     # Pre-populate with a chunk for paper arxiv:1234
     store.upsert([Chunk(paper_id="arxiv:1234", title="T", text="cached text", chunk_index=0)])
 
@@ -264,12 +263,11 @@ def test_vector_store_cache_hit(tmp_path: Path) -> None:
     assert chunks == []  # retrieve_and_chunk returns newly fetched chunks only
 
 
-def test_vector_store_upsert_and_query() -> None:
-    """InMemoryVectorStore upserts and returns chunks."""
+def test_vector_store_upsert_and_query(any_vector_store) -> None:
+    """VectorStore upserts and returns relevant chunks (both backends)."""
     from agents.literature.retriever import Chunk
-    from agents.literature.vector_store import InMemoryVectorStore
 
-    store = InMemoryVectorStore()
+    store = any_vector_store
     chunk = Chunk(paper_id="p1", title="T1", text="some text", chunk_index=0)
     store.upsert([chunk])
 
@@ -279,3 +277,46 @@ def test_vector_store_upsert_and_query() -> None:
     results = store.query("some text", n_results=5)
     assert len(results) == 1
     assert results[0].text == "some text"
+
+
+def test_vector_store_idempotent_upsert(any_vector_store) -> None:
+    """Upserting the same chunk twice does not create duplicates (both backends)."""
+    from agents.literature.retriever import Chunk
+
+    store = any_vector_store
+    chunk = Chunk(paper_id="p_dup", title="Dup", text="duplicate text", chunk_index=0)
+    store.upsert([chunk])
+    store.upsert([chunk])  # second upsert of the exact same chunk
+
+    results = store.query("duplicate text", n_results=10)
+    assert len(results) == 1  # still only one entry
+
+
+def test_chroma_vector_store_persistence(tmp_path: Path) -> None:
+    """ChromaVectorStore persists chunks so a new instance sees previous data."""
+    pytest.importorskip("chromadb")
+    from agents.literature.retriever import Chunk
+    from agents.literature.vector_store import ChromaVectorStore, _OfflineEmbeddingFunction
+
+    persist_dir = str(tmp_path / "chroma_persist")
+    collection_name = "test_persistence"
+    ef = _OfflineEmbeddingFunction()
+
+    # First instance: upsert a chunk
+    store1 = ChromaVectorStore(persist_dir=persist_dir, collection_name=collection_name, embedding_function=ef)
+    chunk = Chunk(
+        paper_id="p_persist",
+        title="Persistence Test",
+        text="persistence check text",
+        chunk_index=0,
+    )
+    store1.upsert([chunk])
+    assert store1.has_paper("p_persist")
+
+    # Second instance pointing at the same directory must see the stored chunk
+    store2 = ChromaVectorStore(persist_dir=persist_dir, collection_name=collection_name, embedding_function=ef)
+    assert store2.has_paper("p_persist"), "ChromaVectorStore did not persist data across instances."
+
+    results = store2.query("persistence check", n_results=5)
+    assert len(results) == 1
+    assert results[0].paper_id == "p_persist"
