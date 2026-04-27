@@ -90,7 +90,7 @@ class DockerSandbox:
 
     def __init__(self, cfg: dict | None = None) -> None:
         sandbox_cfg = (cfg or {}).get("sandbox", {})
-        self._backend: str = sandbox_cfg.get("backend", "subprocess")  # subprocess is the safe default
+        self._backend: str = sandbox_cfg.get("backend", "subprocess")  # subprocess fallback; set "docker" in config.yaml to enable isolation
         self._image: str = sandbox_cfg.get("image", "python:3.11-slim")
         self._mem_limit: str = str(sandbox_cfg.get("mem_limit", "512m"))
         self._cpu_count: int = int(sandbox_cfg.get("cpu_count", 1))

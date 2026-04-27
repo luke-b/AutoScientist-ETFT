@@ -101,7 +101,8 @@ class LiteratureSynthesizer:
         papers:
             Optional list of PaperRecord objects for metadata.
         """
-        # Prefer semantically-relevant chunks from the vector store
+        # Prefer semantically-relevant chunks from the vector store.
+        # getattr guards against __new__-based test instantiation that skips __init__.
         vector_store = getattr(self, "_vector_store", None)
         n_results = getattr(self, "_n_results", 20)
         if vector_store is not None:
