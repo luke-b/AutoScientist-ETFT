@@ -124,10 +124,7 @@ class _OfflineEmbeddingFunction:
 
     _DIM = 128
 
-    def __init__(self) -> None:
-        pass
-
-    def __call__(self, input: list[str]) -> list[list[float]]:
+    def __call__(self, input: list[str]) -> list[list[float]]:  # noqa: A002
         embeddings: list[list[float]] = []
         for text in input:
             vec = [0.0] * self._DIM
@@ -142,7 +139,7 @@ class _OfflineEmbeddingFunction:
 
     # -- ChromaDB duck-typed interface --
 
-    def embed_query(self, input: list[str]) -> list[list[float]]:
+    def embed_query(self, input: list[str]) -> list[list[float]]:  # noqa: A002
         """Delegate to __call__ (query and document embeddings are identical)."""
         return self(input)
 
@@ -151,7 +148,7 @@ class _OfflineEmbeddingFunction:
         return "offline_hash"
 
     @staticmethod
-    def build_from_config(config: dict) -> _OfflineEmbeddingFunction:
+    def build_from_config(embedding_config: dict) -> _OfflineEmbeddingFunction:  # noqa: ARG004
         return _OfflineEmbeddingFunction()
 
     def get_config(self) -> dict:
