@@ -3,108 +3,108 @@
 
 ---
 
-## Třívrstvý model dokumentace — přehled
+## Three-Tier Documentation Model — Overview
 
-| Soubor | Dokument | Účel | DocSend nastavení |
+| File | Document | Purpose | DocSend Settings |
 |---|---|---|---|
-| **A** | `File-A_Executive-Teaser.md` | Vyvolat FOMO, prodat vizi | Stahování povoleno · e-mail tracking |
-| **B** | `File-B_Strategic-Deck.md` | Techniku převést na byznysový příběh | Stahování zakázáno · Dynamic Watermarking |
-| **C** | `File-C_Technical-Whitepaper-Guide.md` | Deep Due Diligence | NDA Gating · stahování zakázáno · Dynamic Watermarking |
+| **A** | `File-A_Executive-Teaser.md` | Generate FOMO, sell the vision | Download allowed · Email tracking |
+| **B** | `File-B_Strategic-Deck.md` | Translate technology into a business narrative | Download disabled · Dynamic Watermarking |
+| **C** | `File-C_Technical-Whitepaper-Guide.md` | Deep Due Diligence | NDA Gating · Download disabled · Dynamic Watermarking |
 
 ---
 
-## Krok 1 — Připravit PDF/PPTX z Markdown souborů
+## Step 1 — Prepare PDF/PPTX from Markdown Files
 
-### Soubor A (Executive Teaser)
-- Převést `File-A_Executive-Teaser.md` do PDF (max 2 strany, A4 nebo Letter)
-- Font: sans-serif (Inter, DM Sans nebo Helvetica)
-- Maximální velikost: **10 MB** (pro rychlé načítání na mobilu)
-- Doporučuje se černobílé nebo tmavé téma s výraznými akcenty
+### File A (Executive Teaser)
+- Convert `File-A_Executive-Teaser.md` to PDF (max 2 pages, A4 or Letter)
+- Font: sans-serif (Inter, DM Sans, or Helvetica)
+- Maximum size: **10 MB** (for fast loading on mobile)
+- Dark theme with strong accent colours recommended
 
-### Soubor B (Strategic Deck)
-- Převést `File-B_Strategic-Deck.md` do PPTX nebo PDF ve **formátu na šířku (landscape, 16:9)**
-- Každá sekce `## SLIDE X` = jeden slide
-- Klíčové vizuály: Figure 1 a Figure 2 z ETFT.pdf vložit jako obrázky (screenshoty nebo SVG export z LaTeXu)
-- Maximální velikost: **10 MB**
-- Vložit odkaz na `ETFT__AI_Research_Scientist.mp4` (host video na Loom nebo Vimeo) do Slidu 8 nebo 10
+### File B (Strategic Deck)
+- Convert `File-B_Strategic-Deck.md` to PPTX or PDF in **landscape format (16:9)**
+- Each `## SLIDE X` section = one slide
+- Key visuals: Figure 1 and Figure 2 from ETFT.pdf inserted as images (screenshots or SVG export from LaTeX)
+- Maximum size: **10 MB**
+- Embed link to `ETFT__AI_Research_Scientist.mp4` (host video on Loom or Vimeo) in Slide 8 or 10
 
-### Soubor C (Technical Package)
-- `File-C_Technical-Whitepaper-Guide.md` slouží jako navigační průvodce
-- Přiložit originální PDFs jako separátní soubory nebo jako přílohy v DocSendu (Room feature)
-- Přidat WIPO PROOF certifikát jako první stranu Souboru C před distribucí
+### File C (Technical Package)
+- `File-C_Technical-Whitepaper-Guide.md` serves as the navigation guide
+- Attach original PDFs as separate files or as attachments in DocSend (Room feature)
+- Add WIPO PROOF certificate as the first page of File C before distribution
 
 ---
 
-## Krok 2 — DocSend nastavení (step-by-step)
+## Step 2 — DocSend Configuration (Step-by-Step)
 
-### Soubor A
-1. Nahrát PDF do DocSendu
-2. Nastavení odkazu: **Require Email** (visitors must enter email before viewing)
-3. **Allow Download: YES** — chcete, aby si vás uložili
-4. Vytvořit jeden generický odkaz pro cold outreach
+### File A
+1. Upload PDF to DocSend
+2. Link settings: **Require Email** (visitors must enter email before viewing)
+3. **Allow Download: YES** — you want people to save a copy
+4. Create one generic link for cold outreach
 
-### Soubor B
-1. Nahrát landscape PDF/PPTX do DocSendu
-2. Nastavení odkazu:
+### File B
+1. Upload landscape PDF/PPTX to DocSend
+2. Link settings:
    - **Allow Download: NO**
-   - **Dynamic Watermarking: ON** (zobrazí email návštěvníka přes stránky — psychologická bariéra)
+   - **Dynamic Watermarking: ON** (displays the visitor's email across pages — psychological deterrent)
    - **Require Email: YES**
-3. **Vytvořit unikátní odkaz pro každého GP/investora:** např. `etft-pande-a16z`, `etft-khosla`, `etft-sequoia` — pokud odkaz otevře třetí strana, DocSend vás upozorní a odhalí přeposílání
+3. **Create a unique link per GP/investor:** e.g. `etft-pande-a16z`, `etft-khosla`, `etft-sequoia` — if the link is opened by a third party, DocSend will alert you and reveal forwarding
 
-### Soubor C
-1. Nahrát package do DocSendu (použít **DocSend Room** pro více souborů)
-2. Nastavení:
-   - **NDA Gating: ON** — návštěvník musí odsouhlasit mlčenlivost před přístupem
+### File C
+1. Upload the package to DocSend (use **DocSend Room** for multiple files)
+2. Settings:
+   - **NDA Gating: ON** — visitor must agree to confidentiality before gaining access
    - **Allow Download: NO**
    - **Dynamic Watermarking: ON**
-3. Sdílet pouze po explicitní žádosti, nikdy v cold emailu
+3. Share only upon explicit request; never include in a cold email
 
 ---
 
-## Krok 3 — Sekvence distribuce
+## Step 3 — Distribution Sequence
 
 ```
 Email 1 (cold outreach)
-  └── Příloha: [Soubor A odkaz] — Executive Teaser
-  └── CTA: "Sdílím 1-stránkový přehled ETFT. Rád bych znal váš pohled."
+  └── Attachment: [File A link] — Executive Teaser
+  └── CTA: "Sharing a 1-page ETFT overview. Would love to hear your perspective."
 
-Email 2 (pokud otevřeli Soubor A nebo odpověděli)
-  └── Příloha: [Soubor B odkaz — unikátní pro daného GP]
-  └── CTA: "Přikládám strategický deck. Hodí se 20 minut na call příští týden?"
+Email 2 (if they opened File A or replied)
+  └── Attachment: [File B link — unique per GP]
+  └── CTA: "Attaching the strategic deck. Would 20 minutes work for a call next week?"
 
-Email 3 (pokud investor proklikl celý Soubor B nebo se vrátil do 24h)
-  └── Signál: okamžitě zavolat nebo napsat
-  └── Text: "Všiml jsem si, že vás zaujal [konkrétní slide] — mám k tomu čerstvá data..."
-  └── Příloha: [Soubor C odkaz — po podpisu NDA]
+Email 3 (if investor viewed all of File B or returned within 24 h)
+  └── Signal: call or write immediately
+  └── Text: "I noticed you were interested in [specific slide] — I have fresh data on that..."
+  └── Attachment: [File C link — after NDA signature]
 ```
 
 ---
 
-## Krok 4 — Analytika a follow-up pravidla
+## Step 4 — Analytics and Follow-Up Rules
 
-| Signál v DocSendu | Akce |
+| DocSend Signal | Action |
 |---|---|
-| Investor strávil >60 s na Figure 1 (Regression Pipeline, Slide 4) | Příští email: "Všiml jsem si zájmu o de-optimalizační pipeline — máme čerstvá benchmark data" |
-| Investor strávil >60 s na Figure 2 (Open-Loop Ecosystem, Slide 6) | Příští email: zaměřit na autonomní RL feedback loop a škálovatelnost |
-| Soubor B otevřen podruhé do 24 hodin | **Okamžitě zavolat** |
-| Soubor B přeposlán (otevřen jiným emailem) | Kontaktovat nového čtenáře zvlášť |
-| Investor požádá o Soubor C | Poslat NDA + unikátní DocSend Room odkaz |
+| Investor spent >60 s on Figure 1 (Regression Pipeline, Slide 4) | Next email: "Noticed interest in the de-optimisation pipeline — we have fresh benchmark data" |
+| Investor spent >60 s on Figure 2 (Open-Loop Ecosystem, Slide 6) | Next email: focus on the autonomous RL feedback loop and scalability |
+| File B opened a second time within 24 hours | **Call immediately** |
+| File B forwarded (opened by a different email) | Contact the new reader separately |
+| Investor requests File C | Send NDA + unique DocSend Room link |
 
 ---
 
-## Krok 5 — IP ochrana a právní základ
+## Step 5 — IP Protection and Legal Basis
 
-### Vrstvení informací (Algoritmický Black Box)
-- **Soubor A + B:** Popisují *co* systém dělá a jaké jsou výstupy. **Nesdílí** detaily CI/CD Validation Pipeline, D_Perf trénovacího schématu ani orchestrační logiky ARL.
-- **Soubor C:** Sdílí technické detaily až po NDA gating.
+### Information Layering (Algorithmic Black Box)
+- **Files A + B:** Describe *what* the system does and its outputs. Do **not** share CI/CD Validation Pipeline details, D_Perf training schema, or ARL orchestration logic.
+- **File C:** Technical details shared only after NDA gating.
 
-### Metadatová stopa
-DocSend ukládá timestamp každého otevření, IP adresu a email návštěvníka. Tato data mohou sloužit jako podpůrný důkaz o sdílení IP v konkrétním čase.
+### Metadata Trail
+DocSend logs a timestamp for every opening, the visitor's IP address, and their email. This data can serve as supporting evidence of IP sharing at a specific point in time.
 
 ### WIPO PROOF
-Před prvním odesláním Souboru C vygenerovat digitální otisk každého dokumentu přes [wipoproof.wipo.int](https://wipoproof.wipo.int). Certifikát uložit spolu s originálem.
+Before sending File C for the first time, generate a digital fingerprint for each document via [wipoproof.wipo.int](https://wipoproof.wipo.int). Store the certificate alongside the original.
 
-### Cílení — technicky relevantní investoři (příklady)
+### Target Investors — Technically Relevant (Examples)
 - **Anjney Midha (a16z)** — deep tech, AI infrastructure
 - **Vinod Khosla (KV)** — autonomous science, biology AI
 - **Sarah Guo (Conviction)** — AI-native companies
@@ -113,16 +113,18 @@ Před prvním odesláním Souboru C vygenerovat digitální otisk každého doku
 
 ---
 
-## Soubory v tomto adresáři
+## Files in This Directory
 
-| Soubor | Popis |
+| File | Description |
 |---|---|
-| `File-A_Executive-Teaser.md` | Soubor A — Executive Teaser (1–2 strany) |
-| `File-B_Strategic-Deck.md` | Soubor B — Strategic Presentation Deck (10 slidů) |
-| `File-C_Technical-Whitepaper-Guide.md` | Soubor C — Průvodce technickým balíčkem + NDA notice |
-| `README.md` | Tento soubor — DocSend strategie a distribuční playbook |
+| `File-A_Executive-Teaser.md` | File A — Executive Teaser (1–2 pages) |
+| `File-B_Strategic-Deck.md` | File B — Strategic Presentation Deck (10 slides) |
+| `File-C_Technical-Whitepaper-Guide.md` | File C — Technical Package Navigation Guide + NDA notice |
+| `README.md` | This file — DocSend strategy and distribution playbook |
+| `build_docs.py` | Helper script — converts Markdown to polished PDF/PPTX |
+| `templates/` | Design templates used by the build script |
 
-**Zdrojové dokumenty:** viz `../papers/`
+**Source documents:** see `../papers/`
 
 ---
 
