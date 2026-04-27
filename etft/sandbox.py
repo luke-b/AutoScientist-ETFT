@@ -142,6 +142,9 @@ class DockerSandbox:
             # this source tree.  The profile blocks dangerous syscalls
             # (ptrace, mount, clone with new namespaces, etc.) that could
             # allow container escape.
+            # NOTE: Path(__file__) resolves relative to the installed module
+            # location.  For packaged wheels, consider using
+            # importlib.resources to locate the bundled profile instead.
             _seccomp_path = Path(__file__).parent.parent / "docker" / "seccomp-etft.json"
             if _seccomp_path.exists():
                 cmd += ["--security-opt", f"seccomp={_seccomp_path}"]

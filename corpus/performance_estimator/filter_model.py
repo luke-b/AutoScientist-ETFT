@@ -31,7 +31,9 @@ _DEFAULT_MODEL_PATH = Path("checkpoints/perf_filter.joblib")
 
 # Increment this constant whenever the feature schema changes.
 # Models saved with a different version will be rejected on load.
-CURRENT_FEATURE_VERSION = 2  # v1 = 16 AST features; v2 = 66 (AST + TF-IDF)
+# v1 = 16 AST features (original schema)
+# v2 = 16 AST + len(_ML_VOCAB) TF-IDF features (current schema, 71 total)
+CURRENT_FEATURE_VERSION = 2
 
 
 class ProbabilisticFilter:

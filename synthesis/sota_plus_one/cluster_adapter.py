@@ -34,10 +34,9 @@ from corpus.regression_pipeline.schemas import SOTAPlusOneCandidate
 
 logger = logging.getLogger(__name__)
 
+_MAX_STDERR_TAIL = 500  # characters to include in failure messages from stderr
 
-# ---------------------------------------------------------------------------
-# Abstract base
-# ---------------------------------------------------------------------------
+
 
 
 class ClusterSubmissionAdapter(ABC):
@@ -114,7 +113,7 @@ class LocalSubprocessAdapter(ClusterSubmissionAdapter):
                 f"(job_id={job_id})."
             )
         if result.returncode != 0:
-            stderr_tail = (result.stderr or "")[-500:]
+            stderr_tail = (result.stderr or "")[-_MAX_STDERR_TAIL:]
             raise RuntimeError(
                 f"Physical evaluation failed with exit code {result.returncode} "
                 f"(job_id={job_id}): {stderr_tail}"

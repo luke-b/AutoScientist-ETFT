@@ -130,6 +130,95 @@ def test_arl_pipeline_end_to_end(tmp_path: Path) -> None:
     assert out_file.exists(), "ARL summary JSON was not written."
 
 
+def test_arl_summary_contains_rl_context_prefix(tmp_path: Path) -> None:
+    """run_arl summary JSON includes 'rl_context_prefix' key."""
+    from agents.run_arl import run_arl
+
+    synthesis_response = _make_llm_response(
+        "SYNTHESIS:\nSome finding.\n\nHYPOTHESES:\n- Hypothesis A."
+    )
+    experiment_response = _make_llm_response(f"```python\n{_SIMPLE_ALGO}```")
+
+    call_count = [0]
+
+    def _mock_complete(messages, tools=None):
+        call_count[0] += 1
+        if call_count[0] <= 2:
+            return synthesis_response
+        return experiment_response
+
+    with (
+        patch("etft.llm.LLMClient.complete_with_tools", side_effect=_mock_complete),
+        patch("agents.literature.searcher.LiteratureSearcher.search", return_value=_DUMMY_PAPERS),
+        patch("agents.literature.retriever.httpx.get", side_effect=Exception("no network")),
+    ):
+        summary = run_arl(cfg={}, bottleneck="dropout", output_dir=tmp_path)
+
+    assert "rl_context_prefix" in summary, (
+        "run_arl() summary must include 'rl_context_prefix' key for downstream callers"
+    )
+    assert isinstance(summary["rl_context_prefix"], str)
+
+
+def test_arl_rl_prefix_grows_with_failures(tmp_path: Path) -> None:
+    """
+    After a failing experiment, the RL prefix passed to the next design call
+    must contain negative feedback and grow in length.
+    """
+    from agents.run_arl import run_arl
+
+    synthesis_response = _make_llm_response(
+        "SYNTHESIS:\nFinding.\n\nHYPOTHESES:\n- H1.\n- H2."
+    )
+    # First experiment script succeeds; second fails at runtime
+    _fail_script = "raise RuntimeError('deliberate failure')\n"
+    responses = [
+        _make_llm_response(f"```python\n{_fail_script}```"),   # H1 → fail
+        _make_llm_response(f"```python\n{_SIMPLE_ALGO}```"),   # H2 → pass
+    ]
+    synth_count = [0]
+    exp_count = [0]
+
+    def _mock_complete(messages, tools=None):
+        # Check if this looks like a synthesis call (contains "HYPOTHESES" instructions)
+        msg_text = " ".join(m.get("content", "") or "" for m in messages if isinstance(m, dict))
+        if "Synthesise" in msg_text or synth_count[0] < 2:
+            synth_count[0] += 1
+            return synthesis_response
+        idx = min(exp_count[0], len(responses) - 1)
+        exp_count[0] += 1
+        return responses[idx]
+
+    # Capture which rl_context values were passed to designer.design()
+    rl_contexts_seen: list[str] = []
+    import agents.empirical.experiment_designer as _ed_mod
+    original_design = _ed_mod.ExperimentDesigner.design
+
+    def _patched_design(self, brief, hypothesis_index=0, rl_context=""):
+        rl_contexts_seen.append(rl_context)
+        return original_design(self, brief, hypothesis_index=hypothesis_index, rl_context=rl_context)
+
+    with (
+        patch("etft.llm.LLMClient.complete_with_tools", side_effect=_mock_complete),
+        patch("agents.literature.searcher.LiteratureSearcher.search", return_value=_DUMMY_PAPERS),
+        patch("agents.literature.retriever.httpx.get", side_effect=Exception("no network")),
+        patch.object(_ed_mod.ExperimentDesigner, "design", _patched_design),
+    ):
+        run_arl(cfg={}, bottleneck="test_bottleneck", output_dir=tmp_path)
+
+    assert len(rl_contexts_seen) >= 2, "Expected design() to be called at least twice"
+    # First call: no prior failures → empty RL context
+    assert rl_contexts_seen[0] == "", f"First design call should have empty RL context, got: {rl_contexts_seen[0]!r}"
+    # Second call: first experiment failed → RL context must be non-empty and include a failure
+    assert rl_contexts_seen[1] != "", (
+        "Second design call should receive non-empty RL context after the first experiment failed"
+    )
+    # The RL prefix must convey *some* negative information (reward signal < 0)
+    assert "reward=-" in rl_contexts_seen[1] or "Reason:" in rl_contexts_seen[1], (
+        f"RL context should contain failure information, got: {rl_contexts_seen[1]!r}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Test 3: SOTA+1 generation + triage produces a candidate file
 # ---------------------------------------------------------------------------

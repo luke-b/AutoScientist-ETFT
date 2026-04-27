@@ -4,12 +4,18 @@ feature_extractor.py — Extracts structural features from a Python algorithm.
 Features are numeric scalars fed to the sklearn Probabilistic Heuristic Filter.
 All extraction is static (AST-based + TF-IDF) so no execution is required.
 
-Feature set (66 total)
-----------------------
+Feature set (16 AST + len(_ML_VOCAB) TF-IDF)
+---------------------------------------------
   AST features (16): classic structural counts derived from the parsed AST.
-  TF-IDF features (50): term-frequency scores for a fixed ML-vocabulary
-      that captures optimizer names, layer types, regularisation terms, and
-      other semantic signals relevant to predicting run-time failures.
+  TF-IDF features (one per ML-vocab term): sublinear TF scores for a fixed
+      vocabulary that captures optimizer names, layer types, regularisation
+      terms, and other semantic signals relevant to predicting run-time failures.
+      The vocabulary is defined in ``_ML_VOCAB`` below; the exact count is
+      ``len(_ML_VOCAB)``.
+
+Note: all token matching is done on the lowercased source code so that
+identifiers like ``Adam``, ``SGD``, or ``CUDA`` are correctly captured by the
+lowercase vocabulary terms.
 """
 
 from __future__ import annotations
