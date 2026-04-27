@@ -27,10 +27,70 @@ class FeedbackRouter:
     the negative datasets, and exposes reward signals for in-context RL.
     """
 
-    def __init__(self, cfg: dict | None = None, data_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        cfg: dict | None = None,
+        data_root: Path | None = None,
+        load_history: bool = False,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        cfg:
+            Full runtime configuration dict.
+        data_root:
+            Root directory for data sub-directories.  Defaults to
+            ``cfg['data']['root']`` or ``./data``.
+        load_history:
+            When *True* the router pre-populates its in-memory reward log from
+            ``d_perf/failure_records.jsonl`` so that in-context RL feedback
+            accumulated across previous ARL runs is available immediately.
+        """
         root = data_root or Path((cfg or {}).get("data", {}).get("root", "./data"))
         self._collector = NegativeDataCollector(root)
         self._reward_log: list[FailureRecord] = []
+
+        if load_history:
+            self._load_history()
+
+    # ------------------------------------------------------------------
+    def _load_history(self) -> None:
+        """Pre-populate the reward log from persisted failure records on disk."""
+        count = 0
+        for record in self._collector.iter_records():
+            self._reward_log.append(record)
+            count += 1
+        if count:
+            logger.info(
+                "FeedbackRouter: loaded %d historical FailureRecords for in-context RL.",
+                count,
+            )
+
+    # ------------------------------------------------------------------
+    @classmethod
+    def load_from_disk(
+        cls,
+        data_root: Path,
+        cfg: dict | None = None,
+    ) -> "FeedbackRouter":
+        """
+        Convenience factory that creates a :class:`FeedbackRouter` with the
+        full historical failure log pre-loaded from *data_root*.
+
+        Parameters
+        ----------
+        data_root:
+            Directory containing the ``d_perf/`` sub-directory.
+        cfg:
+            Optional runtime configuration dict.
+
+        Returns
+        -------
+        FeedbackRouter
+            A router whose :attr:`reward_log` already contains all
+            previously persisted :class:`FailureRecord` objects.
+        """
+        return cls(cfg=cfg, data_root=data_root, load_history=True)
 
     # ------------------------------------------------------------------
     def route_experiment_failure(

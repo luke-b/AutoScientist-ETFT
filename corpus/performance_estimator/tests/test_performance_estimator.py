@@ -221,3 +221,97 @@ def test_filter_train_and_predict_with_versioned_payload(tmp_path):
     assert filt._model is not None
     p = filt.predict_failure_probability(pass_code)
     assert 0.0 <= p <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap data generator
+# ---------------------------------------------------------------------------
+
+
+def test_bootstrap_generates_expected_counts(tmp_path):
+    """generate_bootstrap_data writes exactly 2 × n_samples records."""
+    from corpus.performance_estimator.bootstrap import generate_bootstrap_data
+
+    out = tmp_path / "bootstrap.jsonl"
+    total = generate_bootstrap_data(out, n_samples=10)
+
+    assert total == 20  # 10 safe + 10 risky
+    assert out.exists()
+    lines = [ln for ln in out.read_text().strip().splitlines() if ln]
+    assert len(lines) == 20
+
+
+def test_bootstrap_labels_balanced(tmp_path):
+    """Bootstrap data contains equal counts of label=0 and label=1."""
+    import json
+    from corpus.performance_estimator.bootstrap import generate_bootstrap_data
+
+    out = tmp_path / "bootstrap.jsonl"
+    generate_bootstrap_data(out, n_samples=15)
+
+    lines = [json.loads(ln) for ln in out.read_text().strip().splitlines() if ln]
+    labels = [r["label"] for r in lines]
+    assert labels.count(0) == 15
+    assert labels.count(1) == 15
+
+
+def test_bootstrap_features_non_empty(tmp_path):
+    """Each bootstrap record must have a non-empty features dict."""
+    import json
+    from corpus.performance_estimator.bootstrap import generate_bootstrap_data
+
+    out = tmp_path / "bootstrap.jsonl"
+    generate_bootstrap_data(out, n_samples=5)
+
+    for line in out.read_text().strip().splitlines():
+        record = json.loads(line)
+        assert record["features"], f"Empty features in: {record['algorithm_id']}"
+
+
+def test_bootstrap_can_train_filter(tmp_path):
+    """A filter trained on bootstrap data achieves > 60 % accuracy on held-out data."""
+    import numpy as np
+    from sklearn.model_selection import train_test_split
+
+    from corpus.performance_estimator.bootstrap import generate_bootstrap_data
+    from corpus.performance_estimator.dataset_builder import PerfDatasetBuilder
+    from corpus.performance_estimator.feature_extractor import feature_names
+    from corpus.performance_estimator.train_filter import train
+
+    d_perf_dir = tmp_path / "d_perf"
+    d_perf_dir.mkdir()
+    generate_bootstrap_data(d_perf_dir / "bootstrap.jsonl", n_samples=50)
+
+    output_path = tmp_path / "perf_filter.joblib"
+    train(d_perf_dir, output_path)
+
+    assert output_path.exists()
+
+    # Evaluate
+    import joblib
+    payload = joblib.load(output_path)
+    model = payload["model"]
+    names = feature_names()
+
+    samples = PerfDatasetBuilder.load(d_perf_dir / "bootstrap.jsonl")
+    X = np.array([[s.features.get(n, 0.0) for n in names] for s in samples])  # noqa: N806
+    y = np.array([s.label for s in samples])
+    _, X_test, _, y_test = train_test_split(X, y, test_size=0.3, random_state=7, stratify=y)  # noqa: N806
+
+    accuracy = (model.predict(X_test) == y_test).mean()
+    assert accuracy > 0.60, f"Filter accuracy {accuracy:.2%} below 60% threshold."
+
+
+def test_train_filter_bootstrap_flag_generates_data(tmp_path):
+    """train(..., bootstrap=True) auto-generates data when dir is empty."""
+    from corpus.performance_estimator.train_filter import train
+
+    empty_dir = tmp_path / "d_perf_empty"
+    empty_dir.mkdir()
+    output_path = tmp_path / "model.joblib"
+
+    train(empty_dir, output_path, bootstrap=True)
+
+    # Bootstrap data should have been created
+    assert (empty_dir / "bootstrap.jsonl").exists()
+    assert output_path.exists()

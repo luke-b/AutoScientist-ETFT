@@ -204,7 +204,7 @@ def test_arl_rl_prefix_grows_with_failures(tmp_path: Path) -> None:
         patch("agents.literature.retriever.httpx.get", side_effect=Exception("no network")),
         patch.object(_ed_mod.ExperimentDesigner, "design", _patched_design),
     ):
-        run_arl(cfg={}, bottleneck="test_bottleneck", output_dir=tmp_path)
+        run_arl(cfg={}, bottleneck="test_bottleneck", output_dir=tmp_path, data_root=tmp_path)
 
     assert len(rl_contexts_seen) >= 2, "Expected design() to be called at least twice"
     # First call: no prior failures → empty RL context

@@ -37,7 +37,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
+def run_arl(
+    cfg: dict,
+    bottleneck: str,
+    output_dir: Path,
+    data_root: Path | None = None,
+) -> dict:
     """
     Execute the Agentic Research Loop for *bottleneck*.
 
@@ -46,6 +51,21 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
     the router's internal log and the updated RL context prefix is forwarded
     to the *next* experiment design call — closing the organic negative data
     loop within a single ARL campaign.
+
+    Parameters
+    ----------
+    cfg:
+        Runtime configuration dict.
+    bottleneck:
+        The bottleneck component to research (e.g. ``"batch_normalisation"``).
+    output_dir:
+        Directory for run logs and summary files.
+    data_root:
+        Root directory for persisted FailureRecord history used by
+        ``load_history=True``.  Defaults to ``output_dir.parent`` (the
+        conventional data root when ``output_dir`` is e.g.
+        ``./data/arl_results``).  Pass an explicit path to control where
+        cross-run RL history is read from.
 
     Returns
     -------
@@ -58,8 +78,10 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
 
     logger.info("=== Agentic Research Loop | bottleneck=%r ===", bottleneck)
 
+    effective_data_root = data_root if data_root is not None else output_dir.parent
+
     run_log = RunLogger(output_dir / "runs")
-    router = FeedbackRouter(cfg, data_root=output_dir.parent)
+    router = FeedbackRouter(cfg, data_root=effective_data_root, load_history=True)
 
     # --- Build persistent vector store ---
     vector_store = build_vector_store(cfg)

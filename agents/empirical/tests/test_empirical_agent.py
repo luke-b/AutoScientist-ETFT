@@ -154,6 +154,64 @@ class TestExperimentRunner:
 
 
 # ---------------------------------------------------------------------------
+# Sandbox security hardening
+# ---------------------------------------------------------------------------
+
+
+class TestSandboxSecurityHardening:
+    """Tests for bypass patterns that must be caught by _check_imports."""
+
+    def setup_method(self):
+        self.runner = ExperimentRunner()
+
+    def test_exec_call_blocked(self):
+        result = self.runner.run("exec('import os')\n")
+        assert not result.success
+        assert "exec" in result.error_message
+
+    def test_eval_call_blocked(self):
+        result = self.runner.run("x = eval('1+1')\n")
+        assert not result.success
+        assert "eval" in result.error_message
+
+    def test_dunder_import_call_blocked(self):
+        result = self.runner.run("os = __import__('os')\n")
+        assert not result.success
+        assert "__import__" in result.error_message
+
+    def test_compile_call_blocked(self):
+        result = self.runner.run("compile('x=1', '<str>', 'exec')\n")
+        assert not result.success
+        assert "compile" in result.error_message
+
+    def test_importlib_import_module_blocked(self):
+        result = self.runner.run(
+            "import importlib\nimportlib.import_module('os')\n"
+        )
+        assert not result.success
+        assert "importlib" in result.error_message
+
+    def test_getattr_exec_blocked(self):
+        # Use builtins indirectly without importing to trigger the getattr check
+        result = self.runner.run("getattr(__builtins__, 'exec')('pass')\n")
+        assert not result.success
+        assert "exec" in result.error_message
+
+    def test_allowed_call_passes(self):
+        result = self.runner.run(
+            "import numpy as np\nprint('METRIC: val=1.0')\n"
+        )
+        assert result.success
+
+    def test_custom_blocked_builtin_from_config(self):
+        cfg = {"agents": {"empirical": {"blocked_builtins": ["vars"]}}}
+        runner = ExperimentRunner(cfg)
+        result = runner.run("vars()\n")
+        assert not result.success
+        assert "vars" in result.error_message
+
+
+# ---------------------------------------------------------------------------
 # _parse_metrics
 # ---------------------------------------------------------------------------
 

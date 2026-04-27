@@ -101,6 +101,11 @@ agents:
       - scipy
       - torch
       - sklearn
+    blocked_builtins:               # Additional dangerous builtins to block (beyond defaults)
+      - exec
+      - eval
+      - __import__
+      - compile
 
 # ---------------------------------------------------------------------------
 # Vector Store (persistent RAG memory for literature agents)
@@ -124,6 +129,33 @@ synthesis:
     max_candidates: 3               # Generate N candidates and pick the best
 
 # ---------------------------------------------------------------------------
+# Cluster Submission (optional — required for SlurmAdapter / KubernetesAdapter)
+# ---------------------------------------------------------------------------
+cluster:
+  # Default adapter for physical GPU evaluation.
+  # Options: "local" | "slurm" | "kubernetes"
+  adapter: "local"
+
+  slurm:
+    partition: "gpu"
+    n_gpus: 1
+    mem_gb: 32
+    time_limit: "01:00:00"       # HH:MM:SS
+    python_path: "python3"
+    poll_interval_seconds: 30
+    timeout_seconds: 3600
+
+  k8s:
+    namespace: "default"
+    image: "python:3.11-slim"
+    gpu_count: 1
+    memory_limit: "8Gi"
+    cpu_limit: "4"
+    poll_interval_seconds: 10
+    timeout_seconds: 1800
+    service_account: ""          # optional Kubernetes service account
+
+# ---------------------------------------------------------------------------
 # Fine-tuning
 # ---------------------------------------------------------------------------
 training:
@@ -138,6 +170,7 @@ training:
   gradient_accumulation_steps: 4
   learning_rate: 2.0e-4
   fp16: true
+  val_split: 0.1          # Fraction of corpus held out for validation (0 to disable)
   dataset_path: "./data"
   # OpenAI fine-tune path (alternative)
   openai_finetune_model: "gpt-3.5-turbo"
