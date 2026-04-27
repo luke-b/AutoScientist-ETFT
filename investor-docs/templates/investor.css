@@ -1,0 +1,341 @@
+/* ============================================================
+   ETFT / AutoScientist — Investor Document Theme
+   Designed for WeasyPrint PDF rendering
+   ============================================================ */
+
+/* ── Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Page setup ── */
+@page {
+  size: A4;
+  margin: 22mm 20mm 24mm 22mm;
+
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font-family: 'Inter', Helvetica, Arial, sans-serif;
+    font-size: 8pt;
+    color: #8A94A6;
+    letter-spacing: 0.04em;
+  }
+
+  @bottom-left {
+    content: "ETFT · AutoScientist · Confidential";
+    font-family: 'Inter', Helvetica, Arial, sans-serif;
+    font-size: 8pt;
+    color: #8A94A6;
+    letter-spacing: 0.04em;
+  }
+}
+
+@page :first {
+  @bottom-right { content: none; }
+  @bottom-left  { content: none; }
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 10.5pt;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  line-height: 1.65;
+  color: #1A1F2E;
+  background: #FFFFFF;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Cover / title block ── */
+.cover {
+  page-break-after: always;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240mm;
+  background: linear-gradient(145deg, #0D1117 0%, #161B27 60%, #1E2640 100%);
+  color: #FFFFFF;
+  padding: 40mm 28mm;
+  border-radius: 0;
+}
+
+/* ── Typography ── */
+h1 {
+  font-size: 26pt;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+  margin: 0 0 6mm 0;
+  border: none;
+}
+
+h1.dark {
+  color: #0D1117;
+}
+
+h2 {
+  font-size: 15pt;
+  font-weight: 600;
+  color: #0D1117;
+  letter-spacing: -0.01em;
+  margin: 10mm 0 3mm 0;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid #3B6BFF;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 11.5pt;
+  font-weight: 600;
+  color: #1A1F2E;
+  margin: 7mm 0 2mm 0;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 10.5pt;
+  font-weight: 600;
+  color: #3B6BFF;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 5mm 0 1.5mm 0;
+  page-break-after: avoid;
+}
+
+p {
+  margin: 0 0 3.5mm 0;
+  orphans: 3;
+  widows: 3;
+}
+
+strong {
+  font-weight: 600;
+  color: #0D1117;
+}
+
+em {
+  color: #4A5568;
+}
+
+a {
+  color: #3B6BFF;
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+/* ── Accent / lead paragraph ── */
+p.lead {
+  font-size: 12pt;
+  font-weight: 300;
+  color: #4A5568;
+  line-height: 1.7;
+  margin-bottom: 6mm;
+}
+
+/* ── Section divider ── */
+hr {
+  border: none;
+  border-top: 1px solid #E2E8F0;
+  margin: 7mm 0;
+}
+
+/* ── Blockquote — callout style ── */
+blockquote {
+  margin: 5mm 0;
+  padding: 4mm 6mm 4mm 5mm;
+  background: #F0F4FF;
+  border-left: 4px solid #3B6BFF;
+  border-radius: 0 4px 4px 0;
+  font-size: 10.5pt;
+  color: #2D3748;
+  font-style: normal;
+}
+
+blockquote p {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ── Code / monospace ── */
+code {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 8.5pt;
+  background: #F7F8FA;
+  color: #1A1F2E;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  border: 1px solid #E2E8F0;
+}
+
+pre {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 8pt;
+  line-height: 1.55;
+  background: #0D1117;
+  color: #C9D1D9;
+  padding: 5mm 6mm;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 4mm 0;
+  page-break-inside: avoid;
+  border: 1px solid #21262D;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ── Tables ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4mm 0 6mm 0;
+  font-size: 9.5pt;
+  page-break-inside: avoid;
+}
+
+thead tr {
+  background: #0D1117;
+  color: #FFFFFF;
+}
+
+thead th {
+  padding: 3mm 4mm;
+  text-align: left;
+  font-weight: 600;
+  font-size: 9pt;
+  letter-spacing: 0.03em;
+  border: none;
+}
+
+tbody tr {
+  border-bottom: 1px solid #E2E8F0;
+}
+
+tbody tr:nth-child(even) {
+  background: #F7F8FA;
+}
+
+tbody tr:hover {
+  background: #EEF2FF;
+}
+
+td {
+  padding: 2.5mm 4mm;
+  vertical-align: top;
+  color: #2D3748;
+}
+
+/* ── Lists ── */
+ul, ol {
+  margin: 2mm 0 4mm 0;
+  padding-left: 6mm;
+}
+
+li {
+  margin-bottom: 1.5mm;
+  line-height: 1.6;
+}
+
+li > ul, li > ol {
+  margin: 1mm 0 1mm 0;
+}
+
+/* ── Metric / KPI highlight boxes ── */
+.metric-row {
+  display: flex;
+  gap: 4mm;
+  margin: 5mm 0;
+  page-break-inside: avoid;
+}
+
+.metric-box {
+  flex: 1;
+  background: #F0F4FF;
+  border: 1px solid #C7D7FF;
+  border-top: 3px solid #3B6BFF;
+  border-radius: 6px;
+  padding: 4mm 5mm;
+  text-align: center;
+}
+
+.metric-box .value {
+  font-size: 20pt;
+  font-weight: 700;
+  color: #3B6BFF;
+  line-height: 1.1;
+  display: block;
+}
+
+.metric-box .label {
+  font-size: 8pt;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 1mm;
+  display: block;
+}
+
+/* ── Alert / notice box ── */
+.notice {
+  background: #FFFBEB;
+  border: 1px solid #F6C843;
+  border-left: 4px solid #F6C843;
+  border-radius: 0 6px 6px 0;
+  padding: 4mm 5mm;
+  margin: 5mm 0;
+  font-size: 9.5pt;
+  color: #744210;
+  page-break-inside: avoid;
+}
+
+.notice.confidential {
+  background: #FFF5F5;
+  border-color: #FC8181;
+  color: #742A2A;
+}
+
+/* ── Tag / badge ── */
+.badge {
+  display: inline-block;
+  background: #3B6BFF;
+  color: #FFFFFF;
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.3em 0.7em;
+  border-radius: 3px;
+  margin-right: 2mm;
+}
+
+.badge.green  { background: #38A169; }
+.badge.orange { background: #DD6B20; }
+.badge.red    { background: #C53030; }
+.badge.grey   { background: #718096; }
+
+/* ── Page-break helpers ── */
+.page-break { page-break-before: always; }
+.no-break   { page-break-inside: avoid; }
+
+/* ── Footer metadata (italic small text at doc end) ── */
+p.doc-meta {
+  font-size: 8pt;
+  color: #8A94A6;
+  text-align: center;
+  margin-top: 8mm;
+  border-top: 1px solid #E2E8F0;
+  padding-top: 3mm;
+}
