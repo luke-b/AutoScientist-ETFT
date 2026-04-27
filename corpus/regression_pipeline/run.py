@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 
 from corpus.regression_pipeline.cicd_validator import CICDValidator
 from corpus.regression_pipeline.dataset_builder import DatasetBuilder
+from corpus.regression_pipeline.fitness_evaluator import FitnessEvaluator
 from corpus.regression_pipeline.regression_agent import RegressionAgent
 from corpus.regression_pipeline.schemas import TrajectoryStep
 from etft.config import load_config
@@ -62,6 +63,7 @@ def run_regression_pipeline(
 
     agent = RegressionAgent(cfg)
     validator = CICDValidator(cfg)
+    evaluator = FitnessEvaluator(cfg)
 
     steps: list[TrajectoryStep] = [
         TrajectoryStep(
@@ -85,7 +87,7 @@ def run_regression_pipeline(
             logger.warning("Validation failed at step %d (%s) — stopping early.", step, result.status)
             break
 
-        estimated_fitness = current_fitness * 0.85  # placeholder delta; real eval replaces this
+        estimated_fitness = evaluator.evaluate(predecessor_code, current_fitness)
         steps.append(
             TrajectoryStep(
                 step_index=step,

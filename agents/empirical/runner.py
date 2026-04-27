@@ -7,20 +7,17 @@ Safety measures:
   - Script size guard (64 KB)
   - Package whitelist enforced via AST import check
   - No network access (scripts must use synthetic data)
+  - Docker-isolated execution via DockerSandbox (falls back to subprocess)
 """
 
 from __future__ import annotations
 
 import ast
 import logging
-import subprocess
-import sys
-import tempfile
-import time
 import uuid
-from pathlib import Path
 
 from corpus.regression_pipeline.schemas import ExperimentResult
+from etft.sandbox import DockerSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +33,7 @@ class ExperimentRunner:
         self.max_script_size: int = int(emp_cfg.get("max_script_size_bytes", 65536))
         allowed = emp_cfg.get("allowed_packages", list(_DEFAULT_ALLOWED))
         self._allowed: set[str] = set(allowed) | _DEFAULT_ALLOWED
+        self._sandbox = DockerSandbox(cfg)
 
     # ------------------------------------------------------------------
     def run(self, script: str) -> ExperimentResult:
@@ -67,52 +65,36 @@ class ExperimentRunner:
                 error_message=f"Disallowed import: {violation!r}",
             )
 
-        # Write to temp file and execute
-        with tempfile.NamedTemporaryFile(
-            suffix=".py", delete=False, mode="w", prefix="etft_exp_"
-        ) as f:
-            f.write(script)
-            tmp_path = f.name
+        # Execute via sandbox (Docker if available, subprocess fallback)
+        result = self._sandbox.run_script(script, timeout=self.timeout)
 
-        start = time.perf_counter()
-        try:
-            proc = subprocess.run(
-                [sys.executable, tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-            )
-            _duration = time.perf_counter() - start
-
-            if proc.returncode != 0:
-                return ExperimentResult(
-                    experiment_id=experiment_id,
-                    script=script,
-                    stdout=proc.stdout,
-                    stderr=proc.stderr,
-                    success=False,
-                    error_message=f"Exit code {proc.returncode}",
-                )
-
-            metrics = _parse_metrics(proc.stdout)
-            return ExperimentResult(
-                experiment_id=experiment_id,
-                script=script,
-                stdout=proc.stdout,
-                stderr=proc.stderr,
-                metrics=metrics,
-                success=True,
-            )
-
-        except subprocess.TimeoutExpired:
+        if result.returncode == 124:
             return ExperimentResult(
                 experiment_id=experiment_id,
                 script=script,
                 success=False,
                 error_message=f"Experiment timed out after {self.timeout}s.",
             )
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
+
+        if result.returncode != 0:
+            return ExperimentResult(
+                experiment_id=experiment_id,
+                script=script,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                success=False,
+                error_message=f"Exit code {result.returncode}",
+            )
+
+        metrics = _parse_metrics(result.stdout)
+        return ExperimentResult(
+            experiment_id=experiment_id,
+            script=script,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            metrics=metrics,
+            success=True,
+        )
 
     # ------------------------------------------------------------------
     def _check_imports(self, script: str) -> str | None:

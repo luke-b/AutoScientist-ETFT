@@ -6,11 +6,15 @@ retrieved literature chunks into a structured ResearchBrief.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from agents.literature.retriever import Chunk
 from corpus.regression_pipeline.schemas import ResearchBrief
 from etft.agent import AgentClient
 from etft.skills.literature_skills import FetchAndChunkPapersSkill, SearchArxivSkill
+
+if TYPE_CHECKING:
+    from agents.literature.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +69,11 @@ def _parse_response(text: str) -> tuple[str, list[str]]:
 class LiteratureSynthesizer:
     """Calls the coding-agent proxy to synthesise literature into a ResearchBrief."""
 
-    def __init__(self, cfg: dict | None = None) -> None:
+    def __init__(self, cfg: dict | None = None, vector_store: VectorStore | None = None) -> None:
         self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
+        self._vector_store = vector_store
+        vs_cfg = (cfg or {}).get("vector_store", {})
+        self._n_results: int = int(vs_cfg.get("n_results", 20))
 
     # ------------------------------------------------------------------
     def synthesize(
@@ -77,7 +84,11 @@ class LiteratureSynthesizer:
         papers: list | None = None,
     ) -> ResearchBrief:
         """
-        Produce a ResearchBrief from *chunks* for the given *bottleneck*.
+        Produce a ResearchBrief for the given *bottleneck*.
+
+        If a vector store is available, performs a semantic similarity query
+        for *bottleneck* to retrieve the most relevant passages instead of
+        using the raw *chunks* list in insertion order.
 
         Parameters
         ----------
@@ -86,10 +97,19 @@ class LiteratureSynthesizer:
         query:
             The search query used to retrieve the chunks.
         chunks:
-            Text passages from retrieved papers.
+            Text passages from retrieved papers (used when no vector store).
         papers:
             Optional list of PaperRecord objects for metadata.
         """
+        # Prefer semantically-relevant chunks from the vector store.
+        # getattr guards against __new__-based test instantiation that skips __init__.
+        vector_store = getattr(self, "_vector_store", None)
+        n_results = getattr(self, "_n_results", 20)
+        if vector_store is not None:
+            relevant_chunks = vector_store.query(bottleneck, n_results=n_results)
+            if relevant_chunks:
+                chunks = relevant_chunks
+
         # Build excerpts block (cap at ~4000 chars to stay in context)
         excerpt_texts = [f"[{c.title}]\n{c.text}" for c in chunks]
         combined = "\n\n---\n\n".join(excerpt_texts)

@@ -4,6 +4,17 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
+# Sandbox (isolated execution for generated code)
+# ---------------------------------------------------------------------------
+sandbox:
+  backend: "subprocess"    # "docker" | "subprocess" — docker auto-detected at runtime
+  image: "python:3.11-slim"
+  mem_limit: "512m"
+  cpu_count: 1
+  network_disabled: true
+  timeout_seconds: 60
+
+# ---------------------------------------------------------------------------
 # Agent (ReAct loop)
 # ---------------------------------------------------------------------------
 agent:
@@ -75,6 +86,7 @@ agents:
     chunk_size_tokens: 512
     chunk_overlap_tokens: 64
     arxiv_max_results: 20
+    request_delay_seconds: 0.4     # Delay between paper fetch requests (arXiv rate limit)
   empirical:
     experiment_timeout_seconds: 120
     max_script_size_bytes: 65536    # 64 KB hard limit on generated scripts
@@ -83,6 +95,15 @@ agents:
       - scipy
       - torch
       - sklearn
+
+# ---------------------------------------------------------------------------
+# Vector Store (persistent RAG memory for literature agents)
+# ---------------------------------------------------------------------------
+vector_store:
+  backend: "memory"             # "chroma" | "memory" (chroma requires pip install chromadb)
+  persist_dir: "./data/vector_store"
+  collection: "literature"
+  n_results: 20                 # Number of chunks returned per semantic query
 
 # ---------------------------------------------------------------------------
 # Synthesis
