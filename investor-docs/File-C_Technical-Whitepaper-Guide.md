@@ -1,7 +1,7 @@
 # ETFT (AutoScientist) — Full Technical Whitepaper Package
 ## Tier C — Deep Due Diligence · NDA Gated
 
-*[Soubor C — Technical Whitepaper | DocSend: stahování zakázáno, NDA Gating zapnuto]*
+*File C — Technical Whitepaper | DocSend: download disabled · NDA Gating: on*
 
 ---
 
@@ -149,4 +149,4 @@ under applicable law (including the EU Trade Secrets Directive 2016/943 and US D
 
 *Contact: Lukas Benda · lukas.benda@boldpivot.cz*
 
-*[Soubor C — Full Technical Whitepaper Package | DocSend: NDA Gating · stahování zakázáno · Dynamic Watermarking zapnuto]*
+*File C — Full Technical Whitepaper Package | DocSend: NDA Gating · download disabled · Dynamic Watermarking: on*

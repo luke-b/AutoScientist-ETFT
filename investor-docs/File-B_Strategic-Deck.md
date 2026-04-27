@@ -1,7 +1,7 @@
 # ETFT (AutoScientist) — Strategic Presentation Deck
 ## 8–12 Slide Narrative · Landscape Format
 
-*[Soubor B — Strategic Deck | DocSend: stahování zakázáno, Dynamic Watermarking zapnutý]*
+*File B — Strategic Deck | DocSend: download disabled · Dynamic Watermarking: on*
 
 ---
 
@@ -300,4 +300,4 @@ opens targets no purely capital-efficiency model can reach.
 
 ---
 
-*[Soubor B — Strategic Deck | DocSend: stahování zakázáno · Dynamic Watermarking: zapnuto]*
+*File B — Strategic Deck | DocSend: download disabled · Dynamic Watermarking: on*

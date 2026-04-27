@@ -83,5 +83,5 @@ scientific progress**.
 
 ---
 
-*[Soubor A — Executive Teaser | DocSend: stahování povoleno, tracking e-mail vyžadován]*
-*Plný technický whitepaper dostupný po podpisu NDA.*
+*File A — Executive Teaser | DocSend: download allowed · email tracking required*
+*Full technical whitepaper available under NDA upon request.*
