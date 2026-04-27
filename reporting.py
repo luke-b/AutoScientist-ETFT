@@ -58,7 +58,10 @@ def _load_run_summaries(data_root: Path) -> list[dict[str, Any]]:
         # Count alerts from the sibling alerts.jsonl if present
         alerts_path = run_dir / "alerts.jsonl"
         if alerts_path.exists():
-            alert_count = sum(1 for ln in alerts_path.read_text().splitlines() if ln.strip())
+            try:
+                alert_count = sum(1 for ln in alerts_path.open() if ln.strip())
+            except Exception:
+                alert_count = summary.get("alert_count", 0)
         else:
             alert_count = summary.get("alert_count", 0)
         summary["_alert_count"] = alert_count

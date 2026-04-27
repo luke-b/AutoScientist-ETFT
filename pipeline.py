@@ -149,7 +149,7 @@ def _run_arl_stage(
 
     arl_output_dir = data_root / "arl_results"
     logger.info("[arl] Running ARL for bottleneck '%s' …", bottleneck)
-    summary = run_arl(cfg=cfg, bottleneck=bottleneck, output_dir=arl_output_dir)
+    summary = run_arl(cfg=cfg, bottleneck=bottleneck, output_dir=arl_output_dir, data_root=data_root)
 
     run_record = {
         "bottleneck": bottleneck,

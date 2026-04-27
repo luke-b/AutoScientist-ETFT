@@ -275,7 +275,8 @@ def eval_only(cfg: dict, model_name: str, data_root: Path, checkpoint_dir: Path)
 
     training_args = TrainingArguments(
         output_dir=str(checkpoint_dir),
-        per_device_eval_batch_size=train_cfg.get("per_device_train_batch_size", 4),
+        per_device_eval_batch_size=train_cfg.get("per_device_eval_batch_size",
+                                                  train_cfg.get("per_device_train_batch_size", 4)),
         report_to="none",
     )
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)

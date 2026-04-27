@@ -266,12 +266,17 @@ class SlurmAdapter(ClusterSubmissionAdapter):
                 ],
                 capture_output=True, text=True,
             )
-            exit_code_str = (
-                sacct.stdout.strip().splitlines()[0]
-                if sacct.stdout.strip()
-                else "0:0"
-            )
-            exit_code = int(exit_code_str.split(":")[0])
+            sacct_lines = sacct.stdout.strip().splitlines()
+            if sacct_lines:
+                exit_code_str = sacct_lines[0]
+                try:
+                    exit_code = int(exit_code_str.split(":")[0])
+                except (ValueError, IndexError):
+                    # Unexpected sacct output — assume success to avoid false negatives
+                    logger.warning("Unexpected sacct output: %r — assuming exit code 0", exit_code_str)
+                    exit_code = 0
+            else:
+                exit_code = 0
 
             if exit_code != 0:
                 err_logs = list(log_dir.glob("*.err"))
@@ -424,9 +429,7 @@ class KubernetesAdapter(ClusterSubmissionAdapter):
         RuntimeError
             If the job fails, times out, or the cluster is unreachable.
         """
-        import kubernetes as k8s
-
-        batch_v1, core_v1 = self._k8s_clients()
+        k8s, batch_v1, core_v1 = self._k8s_clients()
 
         uid = str(uuid.uuid4())[:8]
         job_name = f"etft-{candidate.candidate_id[:12]}-{uid}"

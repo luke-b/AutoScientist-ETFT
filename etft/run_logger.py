@@ -83,6 +83,7 @@ class RunLogger:
         self._success_count = 0
         self._alert_count = 0
         self._alert_threshold: float = alert_threshold
+        self._last_alert_rate: float | None = None  # track last alerted rate to avoid spam
 
         logger.info("RunLogger initialised (run_id=%s, dir=%s)", self.run_id, self._run_dir)
         self._mlflow_start()
@@ -129,13 +130,18 @@ class RunLogger:
 
         self._mlflow_log_experiment(record)
 
-        # Auto-alert on low success rate (after initial warm-up of 3 experiments)
+        # Auto-alert on low success rate (after initial warm-up of 3 experiments).
+        # Only emit one alert per 10-experiment window to avoid spam.
         if (
             self._alert_threshold > 0.0
             and self._experiment_count >= 3
         ):
             rolling_rate = self._success_count / self._experiment_count
-            if rolling_rate < self._alert_threshold:
+            if (
+                rolling_rate < self._alert_threshold
+                and (self._last_alert_rate is None or self._experiment_count % 10 == 0)
+            ):
+                self._last_alert_rate = rolling_rate
                 self.log_alert(
                     ALERT_WARNING,
                     f"Low experiment success rate: {rolling_rate:.0%}",
