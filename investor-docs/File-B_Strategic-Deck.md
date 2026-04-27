@@ -279,7 +279,7 @@ opens targets no purely capital-efficiency model can reach.
 
 | Phase | Timeline | Deliverable |
 |---|---|---|
-| PoC validated | ✅ April 2026 | TinyML SOTA+1 discovery, reproducible |
+| PoC validated | [DONE] April 2026 | TinyML SOTA+1 discovery, reproducible |
 | Seed round | Q2 2026 | Compute infra, 3-person core team |
 | Full DL benchmark | Q3 2026 | ETFT applied to ImageNet / LLM architectures |
 | Domain expansion | Q4 2026 | Pharma / materials science pilot partner |
