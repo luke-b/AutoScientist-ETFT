@@ -216,26 +216,6 @@ def _add_line(slide, x1_pct, y1_pct, x2_pct, y2_pct, color_hex, width_pt=1.5):
     return connector
 
 
-def _slide_dark_header(slide, label: str, headline: str, slide_num: int, total: int):
-    """Render the consistent dark header bar used on every slide."""
-    # Full-width dark header band
-    _add_rect(slide, 0, 0, 1.0, 0.22, DARK_BG)
-    # Accent stripe
-    _add_rect(slide, 0, 0.22, 1.0, 0.008, ACCENT)
-
-    # Brand label
-    _add_text_box(slide, 0.03, 0.01, 0.5, 0.08,
-                  "ETFT · AutoScientist", 8, bold=False, color_hex="3B6BFF")
-    # Slide counter
-    from pptx.enum.text import PP_ALIGN
-    _add_text_box(slide, 0.75, 0.01, 0.22, 0.08,
-                  f"{slide_num:02d} / {total:02d}", 8, color_hex="8A94A6",
-                  alignment=PP_ALIGN.RIGHT)
-    # Headline
-    _add_text_box(slide, 0.03, 0.07, 0.94, 0.14,
-                  headline, 18, bold=True, color_hex=WHITE)
-
-
 def _render_slide_content(slide, body_lines: list[str]):
     """Render body lines as bullet points / paragraphs."""
     from pptx.util import Inches, Pt
@@ -386,6 +366,20 @@ def _parse_slides(md_text: str) -> list[dict]:
     return slides
 
 
+def _add_slide_dark_header_pptx(slide, label, headline, slide_num, total):
+    """Dark header band for a content slide."""
+    _add_rect(slide, 0, 0, 1.0, 0.22, DARK_BG)
+    _add_rect(slide, 0, 0.22, 1.0, 0.008, ACCENT)
+    _add_text_box(slide, 0.03, 0.01, 0.5, 0.08,
+                  "ETFT · AutoScientist", 8, color_hex="3B6BFF")
+    from pptx.enum.text import PP_ALIGN
+    _add_text_box(slide, 0.75, 0.01, 0.22, 0.08,
+                  f"{slide_num:02d} / {total:02d}", 8, color_hex="8A94A6",
+                  alignment=PP_ALIGN.RIGHT)
+    _add_text_box(slide, 0.03, 0.06, 0.94, 0.15,
+                  headline, 16, bold=True, color_hex=WHITE)
+
+
 def build_pptx(md_path: Path, out_path: Path) -> None:
     from pptx import Presentation
     from pptx.util import Inches, Pt, Emu
@@ -452,20 +446,6 @@ def build_pptx(md_path: Path, out_path: Path) -> None:
     prs.save(str(out_path))
     size_kb = out_path.stat().st_size // 1024
     print(f"     Done — {size_kb} KB  ({total} content slides + title + closing)")
-
-
-def _add_slide_dark_header_pptx(slide, label, headline, slide_num, total):
-    """Dark header band for a content slide."""
-    _add_rect(slide, 0, 0, 1.0, 0.22, DARK_BG)
-    _add_rect(slide, 0, 0.22, 1.0, 0.008, ACCENT)
-    _add_text_box(slide, 0.03, 0.01, 0.5, 0.08,
-                  "ETFT · AutoScientist", 8, color_hex="3B6BFF")
-    from pptx.enum.text import PP_ALIGN
-    _add_text_box(slide, 0.75, 0.01, 0.22, 0.08,
-                  f"{slide_num:02d} / {total:02d}", 8, color_hex="8A94A6",
-                  alignment=PP_ALIGN.RIGHT)
-    _add_text_box(slide, 0.03, 0.06, 0.94, 0.15,
-                  headline, 16, bold=True, color_hex=WHITE)
 
 
 # ---------------------------------------------------------------------------
