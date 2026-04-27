@@ -41,12 +41,25 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
     """
     Execute the Agentic Research Loop for *bottleneck*.
 
+    The FeedbackRouter is created once per run.  After each failed
+    micro-experiment its negative reward signal is immediately appended to
+    the router's internal log and the updated RL context prefix is forwarded
+    to the *next* experiment design call — closing the organic negative data
+    loop within a single ARL campaign.
+
     Returns
     -------
     dict
-        Summary containing the research brief, experiment results, and metrics.
+        Summary containing the research brief, experiment results, metrics,
+        and the final RL context prefix produced during the run.
     """
+    from etft.run_logger import RunLogger
+    from feedback.rl_loop.feedback_router import FeedbackRouter
+
     logger.info("=== Agentic Research Loop | bottleneck=%r ===", bottleneck)
+
+    run_log = RunLogger(output_dir / "runs")
+    router = FeedbackRouter(cfg, data_root=output_dir.parent)
 
     # --- Build persistent vector store ---
     vector_store = build_vector_store(cfg)
@@ -72,21 +85,44 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
 
     for i, hypothesis in enumerate(brief.hypotheses):
         logger.info("Designing experiment %d / %d: %r", i + 1, len(brief.hypotheses), hypothesis)
+
+        # Retrieve the accumulated RL feedback from all prior failures in this run
+        rl_prefix = router.build_rl_context_prefix()
+
         try:
-            script = designer.design(brief, hypothesis_index=i)
+            script = designer.design(brief, hypothesis_index=i, rl_context=rl_prefix)
         except Exception as exc:
             logger.error("Experiment design failed for hypothesis %d: %s", i, exc)
             continue
 
         result = runner.run(script)
         collector.add(result)
+
         if result.success:
             logger.info("Experiment %d succeeded: %s", i, result.metrics)
+            run_log.log_experiment(
+                hypothesis=hypothesis,
+                result=result,
+                rl_prefix_length=len(rl_prefix),
+            )
         else:
             logger.warning("Experiment %d failed: %s", i, result.error_message)
+            # Route failure immediately so the next design call sees it
+            try:
+                router.route_experiment_failure(result)
+            except Exception as exc:
+                logger.warning("Feedback routing failed for experiment %d: %s", i, exc)
+            run_log.log_experiment(
+                hypothesis=hypothesis,
+                result=result,
+                rl_prefix_length=len(rl_prefix),
+            )
 
     metrics_summary = collector.to_dict()
     logger.info("ARL complete. Success rate: %.0f%%", metrics_summary["success_rate"] * 100)
+
+    # Collect the final RL prefix (includes all failures from this run)
+    final_rl_prefix = router.build_rl_context_prefix()
 
     # --- Persist results ---
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -94,30 +130,16 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
         "bottleneck": bottleneck,
         "research_brief": brief.model_dump(),
         "experiment_metrics": metrics_summary,
+        "rl_context_prefix": final_rl_prefix,
     }
     out_path = output_dir / f"arl_{bottleneck}.json"
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
     logger.info("ARL summary written to %s", out_path)
 
-    # --- Route failures for RL feedback ---
-    _route_failures(collector, cfg, output_dir)
+    run_log.log_run_summary(bottleneck=bottleneck, metrics=metrics_summary)
 
     return summary
-
-
-def _route_failures(collector: MetricsCollector, cfg: dict, output_dir: Path) -> None:
-    """Forward failed experiments to the feedback router."""
-    failures = collector.failures
-    if not failures:
-        return
-    try:
-        from feedback.rl_loop.feedback_router import FeedbackRouter
-        router = FeedbackRouter(cfg, data_root=output_dir.parent)
-        for failure in failures:
-            router.route_experiment_failure(failure)
-    except Exception as exc:
-        logger.warning("Feedback routing skipped: %s", exc)
 
 
 # ---------------------------------------------------------------------------

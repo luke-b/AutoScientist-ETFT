@@ -52,6 +52,34 @@ def from_triage_rejection(candidate: SOTAPlusOneCandidate) -> FailureRecord:
     )
 
 
+def from_physical_eval_failure(
+    candidate: SOTAPlusOneCandidate,
+    failure_reason: str,
+) -> FailureRecord:
+    """
+    Convert a physical GPU/cluster evaluation failure into a FailureRecord.
+
+    Physical evaluation failures use a fixed reward of -2.0 — stronger than
+    micro-experiment failures (-1.0) to reflect the higher cost of committed
+    cluster resources.
+
+    Parameters
+    ----------
+    candidate:
+        The SOTA+1 candidate that failed physical evaluation.
+    failure_reason:
+        Human-readable description of the failure (e.g. "OOM on H100").
+    """
+    return FailureRecord(
+        source="physical_eval",
+        candidate_id=candidate.candidate_id,
+        failure_reason=failure_reason,
+        features={},
+        reward_signal=-2.0,
+        metadata={"trajectory_id": candidate.trajectory_id},
+    )
+
+
 def format_for_context(record: FailureRecord) -> str:
     """
     Format a FailureRecord as a plain-text negative reward signal suitable

@@ -3,7 +3,8 @@ synthesis/sota_plus_one/generate.py — CLI entrypoint for SOTA+1 generation.
 
 Usage:
     python -m synthesis.sota_plus_one.generate --trajectory <id> \\
-        [--bottleneck <component>] [--arl-result ./data/arl_results/arl_X.json]
+        [--bottleneck <component>] [--arl-result ./data/arl_results/arl_X.json] \\
+        [--submit]
 """
 
 from __future__ import annotations
@@ -43,14 +44,41 @@ def generate(
     brief: ResearchBrief,
     empirical_summary: dict | None,
     output_dir: Path,
+    rl_context: str = "",
+    submit: bool = False,
 ) -> list[dict]:
     """
     Generate, triage, and persist SOTA+1 candidates.
 
+    Parameters
+    ----------
+    cfg:
+        Full runtime configuration dict.
+    trajectory_id:
+        Identifier of the source trajectory.
+    sota_code:
+        Source code of the current SOTA algorithm.
+    bottleneck:
+        Bottleneck component identified by Pareto analysis.
+    brief:
+        ResearchBrief from the ARL literature phase.
+    empirical_summary:
+        MetricsCollector.to_dict() output from the ARL empirical phase (or None).
+    output_dir:
+        Directory to write accepted candidate JSON files.
+    rl_context:
+        Optional in-context RL feedback string (accumulated negative reward
+        signals from a prior ARL run).  Forwarded to the synthesizer so the
+        LLM avoids patterns that were already rejected or failed physically.
+    submit:
+        When True, triage-passing candidates are submitted via the configured
+        cluster adapter (defaults to ``LocalSubprocessAdapter``).  Physical
+        evaluation failures are routed back through ``FeedbackRouter``.
+
     Returns
     -------
     list[dict]
-        JSON-serialisable list of candidate dicts (triage passed only).
+        JSON-serialisable list of candidate dicts (all candidates, triage status included).
     """
     synthesizer = SOTAPlusOneSynthesizer(cfg)
     triage = TriageFilter(cfg)
@@ -61,6 +89,7 @@ def generate(
         bottleneck=bottleneck,
         brief=brief,
         empirical_summary=empirical_summary,
+        rl_context=rl_context,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +104,9 @@ def generate(
             with open(out_path, "w") as f:
                 json.dump(scored.model_dump(), f, indent=2)
             logger.info("Candidate %s saved to %s", scored.candidate_id, out_path)
+
+            if submit:
+                _submit_candidate(scored, cfg, output_dir)
         else:
             logger.warning(
                 "Candidate %s rejected (risk=%.3f) — routing to feedback.",
@@ -94,6 +126,28 @@ def _route_triage_failure(candidate: SOTAPlusOneCandidate, cfg: dict) -> None:
         router.route_triage_failure(candidate)
     except Exception as exc:
         logger.debug("Feedback routing skipped: %s", exc)
+
+
+def _submit_candidate(candidate: SOTAPlusOneCandidate, cfg: dict, output_dir: Path) -> None:
+    """Submit a triage-passing candidate via the cluster adapter."""
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter(cfg)
+    try:
+        job_id = adapter.submit(candidate)
+        logger.info("Candidate %s submitted — job_id=%s", candidate.candidate_id, job_id)
+    except Exception as exc:
+        failure_reason = str(exc)
+        logger.warning(
+            "Physical evaluation of candidate %s failed: %s",
+            candidate.candidate_id, failure_reason,
+        )
+        try:
+            from feedback.rl_loop.feedback_router import FeedbackRouter
+            router = FeedbackRouter(cfg, data_root=output_dir.parent)
+            router.route_physical_eval_failure(candidate, failure_reason=failure_reason)
+        except Exception as fb_exc:
+            logger.debug("Physical eval feedback routing skipped: %s", fb_exc)
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +175,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-dir", default="./data/candidates")
     parser.add_argument("--config", default="config.yaml")
+    parser.add_argument(
+        "--submit",
+        action="store_true",
+        default=False,
+        help=(
+            "Submit triage-passing candidates to the cluster adapter for physical evaluation. "
+            "Physical evaluation failures are automatically routed to the feedback loop."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -139,6 +202,7 @@ def main() -> None:
         hypotheses=[],
     )
     empirical_summary = None
+    rl_context = ""
 
     if args.arl_result:
         with open(args.arl_result) as f:
@@ -146,6 +210,7 @@ def main() -> None:
         if "research_brief" in arl:
             brief = ResearchBrief.model_validate(arl["research_brief"])
         empirical_summary = arl.get("experiment_metrics")
+        rl_context = arl.get("rl_context_prefix", "")
 
     generate(
         cfg=cfg,
@@ -155,6 +220,8 @@ def main() -> None:
         brief=brief,
         empirical_summary=empirical_summary,
         output_dir=Path(args.output_dir),
+        rl_context=rl_context,
+        submit=args.submit,
     )
 
 

@@ -55,6 +55,51 @@ def test_designer_calls_proxy():
     designer._agent.run_task.assert_called_once()
 
 
+def test_designer_rl_context_forwarded_to_agent():
+    """rl_context string is present in the context passed to AgentClient."""
+    from etft.skills.base import AgentResult
+
+    designer = ExperimentDesigner.__new__(ExperimentDesigner)
+    designer._agent = MagicMock()
+    designer._agent.run_task.return_value = AgentResult(
+        output="```python\nprint('METRIC: acc=0.9')\n```",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
+    designer.max_script_size = 65536
+
+    rl_signal = "=== IN-CONTEXT RL FEEDBACK (negative signals) ===\n[NEGATIVE FEEDBACK | source=micro_experiment reward=-1.00]\nReason: Script crashed\n=== END FEEDBACK ==="
+    designer.design(_make_brief(), hypothesis_index=0, rl_context=rl_signal)
+
+    # context is passed as a keyword argument named 'context'
+    call_kwargs_full = designer._agent.run_task.call_args.kwargs
+    assert "rl_feedback" in call_kwargs_full.get("context", {}), (
+        "rl_context must be forwarded as 'rl_feedback' in the agent context dict"
+    )
+    assert rl_signal in call_kwargs_full["context"]["rl_feedback"]
+
+
+def test_designer_empty_rl_context_not_injected():
+    """When rl_context is empty string, 'rl_feedback' key must NOT appear in context."""
+    from etft.skills.base import AgentResult
+
+    designer = ExperimentDesigner.__new__(ExperimentDesigner)
+    designer._agent = MagicMock()
+    designer._agent.run_task.return_value = AgentResult(
+        output="```python\nprint('METRIC: v=1')\n```",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
+    designer.max_script_size = 65536
+
+    designer.design(_make_brief(), hypothesis_index=0, rl_context="")
+
+    call_kwargs_full = designer._agent.run_task.call_args.kwargs
+    assert "rl_feedback" not in call_kwargs_full.get("context", {})
+
+
 def test_designer_no_hypotheses_raises():
     designer = ExperimentDesigner.__new__(ExperimentDesigner)
     designer._agent = MagicMock()

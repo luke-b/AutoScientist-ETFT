@@ -277,6 +277,57 @@ All papers are located in the [`papers/`](papers/) directory.
 
 ---
 
+## 📊 Observability
+
+### Structured Run Logging
+
+Every ARL run automatically writes two structured artefacts:
+
+```
+data/runs/<run_id>/
+  experiments.jsonl   # one JSON record per micro-experiment
+  run_summary.json    # aggregated metrics for the whole run
+```
+
+Each experiment record contains:
+```json
+{
+  "timestamp": "2026-04-27T12:00:00+00:00",
+  "run_id": "abc123",
+  "experiment_id": "exp_001",
+  "hypothesis": "Add BatchNorm after conv layers",
+  "success": true,
+  "metrics": {"accuracy": 0.87},
+  "error": null,
+  "rl_prefix_length": 342
+}
+```
+
+The `rl_prefix_length` field tracks how many characters of negative RL feedback were injected into the design prompt — a key signal for diagnosing whether the in-context RL loop is active.
+
+### Optional MLflow Integration
+
+Install [MLflow](https://mlflow.org/) to automatically log metrics, params, and tags:
+
+```bash
+pip install mlflow
+```
+
+When MLflow is importable, the `RunLogger` will:
+- Start (or join) an active MLflow run named `arl/<run_id>`
+- Log per-experiment metrics (`exp/accuracy`, `exp/rl_prefix_length`) at each step
+- Log run-level summary metrics (`run/success_rate`, `run/total_experiments`)
+- Tag the run with `etft.bottleneck` and `etft.run_id`
+
+MLflow is an **optional** dependency — if it is not installed, the logger operates in JSON-only mode with zero overhead.
+
+Launch the MLflow UI to browse runs:
+```bash
+mlflow ui --host 0.0.0.0 --port 5000
+```
+
+---
+
 ## 📄 Citation
 
 If you use this work in your research, please cite:

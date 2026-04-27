@@ -60,10 +60,27 @@ class ExperimentDesigner:
         self.max_script_size: int = int(emp_cfg.get("max_script_size_bytes", 65536))
 
     # ------------------------------------------------------------------
-    def design(self, brief: ResearchBrief, hypothesis_index: int = 0) -> str:
+    def design(
+        self,
+        brief: ResearchBrief,
+        hypothesis_index: int = 0,
+        rl_context: str = "",
+    ) -> str:
         """
         Generate a micro-experiment script for the *hypothesis_index*-th
         hypothesis in *brief*.
+
+        Parameters
+        ----------
+        brief:
+            ResearchBrief produced by the literature synthesis agent.
+        hypothesis_index:
+            Index of the target hypothesis within *brief.hypotheses*.
+        rl_context:
+            Optional in-context RL feedback string (formatted negative reward
+            signals from prior failed experiments in this campaign).  When
+            provided it is prepended to the agent context so the LLM avoids
+            repeating previously observed failure patterns.
 
         Returns
         -------
@@ -85,14 +102,18 @@ class ExperimentDesigner:
             f"Respond with ONLY the Python source code in ```python ... ``` fences."
         )
 
+        context: dict = {
+            "bottleneck": brief.bottleneck,
+            "synthesis": brief.synthesis,
+            "all_hypotheses": hypothesis_list,
+        }
+        if rl_context:
+            context["rl_feedback"] = rl_context
+
         logger.info("Designing experiment for hypothesis: %r", target)
         result = self._agent.run_task(
             task=task,
-            context={
-                "bottleneck": brief.bottleneck,
-                "synthesis": brief.synthesis,
-                "all_hypotheses": hypothesis_list,
-            },
+            context=context,
             system=_SYSTEM,
         )
         script = _extract_code(result.output)

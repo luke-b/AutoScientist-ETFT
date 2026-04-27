@@ -1,0 +1,74 @@
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "syscalls": [
+    {
+      "names": [
+        "ptrace",
+        "process_vm_readv",
+        "process_vm_writev",
+        "mount",
+        "umount2",
+        "pivot_root",
+        "swapon",
+        "swapoff",
+        "reboot",
+        "kexec_load",
+        "kexec_file_load",
+        "init_module",
+        "finit_module",
+        "delete_module",
+        "sysfs",
+        "acct",
+        "settimeofday",
+        "adjtimex",
+        "clock_adjtime",
+        "clock_settime",
+        "stime",
+        "setdomainname",
+        "sethostname",
+        "iopl",
+        "ioperm",
+        "mknod",
+        "mknodat",
+        "quotactl",
+        "nfsservctl",
+        "get_mempolicy",
+        "mbind",
+        "set_mempolicy",
+        "migrate_pages",
+        "move_pages",
+        "perf_event_open",
+        "fanotify_init",
+        "open_by_handle_at",
+        "lookup_dcookie",
+        "bpf",
+        "userfaultfd",
+        "add_key",
+        "request_key",
+        "keyctl",
+        "uselib",
+        "ustat",
+        "syslog",
+        "tuxcall",
+        "security",
+        "vhangup",
+        "_sysctl"
+      ],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1
+    },
+    {
+      "names": ["clone"],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1,
+      "args": [
+        {
+          "index": 0,
+          "value": 2114060288,
+          "op": "SCMP_CMP_MASKED_EQ",
+          "comment": "Block CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWNET"
+        }
+      ]
+    }
+  ]
+}

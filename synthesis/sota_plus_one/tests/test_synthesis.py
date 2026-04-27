@@ -4,6 +4,7 @@ tests/test_synthesis.py — Unit tests for synthesis/sota_plus_one.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -138,3 +139,153 @@ def test_triage_pass_below_threshold(tmp_path):
     )
     result = filt.evaluate(candidate)
     assert result.triage_passed
+
+
+# ---------------------------------------------------------------------------
+# SOTAPlusOneSynthesizer — rl_context injection
+# ---------------------------------------------------------------------------
+
+
+def test_synthesizer_rl_context_forwarded():
+    """rl_context is passed as 'rl_feedback' in the agent context dict."""
+    from etft.skills.base import AgentResult
+
+    synth = SOTAPlusOneSynthesizer.__new__(SOTAPlusOneSynthesizer)
+    synth.max_candidates = 1
+    synth._agent = MagicMock()
+    synth._agent.run_task.return_value = AgentResult(
+        output="IMPLEMENTATION:\n```python\ndef model(): pass\n```\n\nRATIONALE:\nTest.",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
+
+    rl_signal = "=== IN-CONTEXT RL FEEDBACK ===\nsome rejection\n=== END FEEDBACK ===\n"
+    brief = ResearchBrief(
+        bottleneck="dropout",
+        query="dropout",
+        synthesis="Dropout reduces overfitting.",
+        hypotheses=["Add Dropout(0.3)."],
+    )
+    synth.generate("def old(): pass", "t1", "dropout", brief, rl_context=rl_signal)
+
+    call_kwargs = synth._agent.run_task.call_args.kwargs
+    assert "rl_feedback" in call_kwargs.get("context", {}), (
+        "rl_context must be forwarded as 'rl_feedback' in the context dict"
+    )
+    assert rl_signal in call_kwargs["context"]["rl_feedback"]
+
+
+def test_synthesizer_no_rl_context_not_injected():
+    """Empty rl_context must not add 'rl_feedback' key to the context dict."""
+    from etft.skills.base import AgentResult
+
+    synth = SOTAPlusOneSynthesizer.__new__(SOTAPlusOneSynthesizer)
+    synth.max_candidates = 1
+    synth._agent = MagicMock()
+    synth._agent.run_task.return_value = AgentResult(
+        output="IMPLEMENTATION:\n```python\ndef m(): pass\n```\n\nRATIONALE:\nTest.",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
+    brief = ResearchBrief(bottleneck="x", query="x", synthesis="s", hypotheses=["h"])
+    synth.generate("def old(): pass", "t1", "x", brief)
+
+    call_kwargs = synth._agent.run_task.call_args.kwargs
+    assert "rl_feedback" not in call_kwargs.get("context", {})
+
+
+# ---------------------------------------------------------------------------
+# ClusterSubmissionAdapter
+# ---------------------------------------------------------------------------
+
+
+_SIMPLE_SCRIPT = "print('METRIC: accuracy=0.8')\n"
+_FAILING_SCRIPT = "raise RuntimeError('GPU OOM')\n"
+
+
+def _make_candidate(code: str = _SIMPLE_SCRIPT) -> SOTAPlusOneCandidate:
+    return SOTAPlusOneCandidate(
+        candidate_id="cand01",
+        trajectory_id="traj01",
+        code=code,
+        rationale="test candidate",
+    )
+
+
+def test_local_adapter_success():
+    """LocalSubprocessAdapter returns a job_id string when the script succeeds."""
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter()
+    job_id = adapter.submit(_make_candidate(_SIMPLE_SCRIPT))
+    assert isinstance(job_id, str)
+    assert "cand01" in job_id
+
+
+def test_local_adapter_failure_raises():
+    """LocalSubprocessAdapter raises RuntimeError when the script fails."""
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter()
+    with pytest.raises(RuntimeError):
+        adapter.submit(_make_candidate(_FAILING_SCRIPT))
+
+
+def test_slurm_adapter_raises_not_implemented():
+    from synthesis.sota_plus_one.cluster_adapter import SlurmAdapter
+
+    adapter = SlurmAdapter()
+    with pytest.raises(NotImplementedError):
+        adapter.submit(_make_candidate())
+
+
+def test_kubernetes_adapter_raises_not_implemented():
+    from synthesis.sota_plus_one.cluster_adapter import KubernetesAdapter
+
+    adapter = KubernetesAdapter()
+    with pytest.raises(NotImplementedError):
+        adapter.submit(_make_candidate())
+
+
+# ---------------------------------------------------------------------------
+# FeedbackRouter.route_physical_eval_failure
+# ---------------------------------------------------------------------------
+
+
+def test_physical_eval_failure_routed(tmp_path: Path) -> None:
+    """route_physical_eval_failure persists a FailureRecord with reward=-2.0."""
+    from feedback.rl_loop.feedback_router import FeedbackRouter
+
+    router = FeedbackRouter(data_root=tmp_path)
+    candidate = _make_candidate()
+    record = router.route_physical_eval_failure(
+        candidate,
+        failure_reason="OOM on H100",
+        also_rationale=True,
+    )
+
+    assert record.source == "physical_eval"
+    assert record.reward_signal == pytest.approx(-2.0)
+    assert record.candidate_id == "cand01"
+
+    d_perf_file = tmp_path / "d_perf" / "feedback_failures.jsonl"
+    assert d_perf_file.exists()
+    import json
+    line = json.loads(d_perf_file.read_text().strip().splitlines()[0])
+    assert line["label"] == 1
+    assert "OOM" in line["failure_reason"]
+
+
+def test_physical_eval_failure_in_rl_context(tmp_path: Path) -> None:
+    """route_physical_eval_failure contributes to the RL context prefix."""
+    from feedback.rl_loop.feedback_router import FeedbackRouter
+
+    router = FeedbackRouter(data_root=tmp_path)
+    router.route_physical_eval_failure(_make_candidate(), failure_reason="divergent loss")
+
+    prefix = router.build_rl_context_prefix()
+    assert "physical_eval" in prefix
+    assert "divergent loss" in prefix
+    assert "reward=-2.00" in prefix

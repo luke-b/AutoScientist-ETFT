@@ -88,6 +88,7 @@ class SOTAPlusOneSynthesizer:
         bottleneck: str,
         brief: ResearchBrief,
         empirical_summary: dict | None = None,
+        rl_context: str = "",
     ) -> list[SOTAPlusOneCandidate]:
         """
         Generate up to ``max_candidates`` SOTA+1 proposals.
@@ -104,6 +105,11 @@ class SOTAPlusOneSynthesizer:
             ResearchBrief from the literature agent.
         empirical_summary:
             MetricsCollector.to_dict() output (or None).
+        rl_context:
+            Optional in-context RL feedback string containing negative reward
+            signals from prior triage rejections or physical evaluation failures
+            in the same campaign.  When provided it is prepended to the agent
+            context so the synthesizer avoids repeating known failure patterns.
         """
         emp_text = _format_empirical(empirical_summary)
 
@@ -118,14 +124,18 @@ class SOTAPlusOneSynthesizer:
                 "evidence. Return:\nIMPLEMENTATION:\n```python\n<code here>\n```\n\n"
                 "RATIONALE:\n<explanation here>"
             )
+            context: dict = {
+                "sota_code": sota_code[:3000],
+                "bottleneck": bottleneck,
+                "literature_synthesis": brief.synthesis,
+                "empirical_summary": emp_text,
+            }
+            if rl_context:
+                context["rl_feedback"] = rl_context
+
             result = self._agent.run_task(
                 task=task,
-                context={
-                    "sota_code": sota_code[:3000],
-                    "bottleneck": bottleneck,
-                    "literature_synthesis": brief.synthesis,
-                    "empirical_summary": emp_text,
-                },
+                context=context,
                 system=_SYSTEM,
             )
             code, rationale = _extract_code_and_rationale(result.output)
