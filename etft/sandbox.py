@@ -90,12 +90,20 @@ class DockerSandbox:
 
     def __init__(self, cfg: dict | None = None) -> None:
         sandbox_cfg = (cfg or {}).get("sandbox", {})
-        self._backend: str = sandbox_cfg.get("backend", "subprocess")  # subprocess fallback; set "docker" in config.yaml to enable isolation
+        self._backend: str = sandbox_cfg.get("backend", "subprocess")
         self._image: str = sandbox_cfg.get("image", "python:3.11-slim")
         self._mem_limit: str = str(sandbox_cfg.get("mem_limit", "512m"))
         self._cpu_count: int = int(sandbox_cfg.get("cpu_count", 1))
         self._network_disabled: bool = bool(sandbox_cfg.get("network_disabled", True))
         self._timeout: int = int(sandbox_cfg.get("timeout_seconds", 60))
+
+        if self._backend == "subprocess":
+            logger.warning(
+                "DockerSandbox is running in SUBPROCESS mode.  "
+                "Generated code executes directly in the host process without "
+                "container isolation.  Set sandbox.backend='docker' in config.yaml "
+                "to enable full isolation."
+            )
 
     # ------------------------------------------------------------------
     def run_script(self, script: str, timeout: int | None = None) -> SandboxResult:
@@ -129,6 +137,14 @@ class DockerSandbox:
             ]
             if self._network_disabled:
                 cmd += ["--network", "none"]
+
+            # Apply a minimal seccomp profile when one is bundled alongside
+            # this source tree.  The profile blocks dangerous syscalls
+            # (ptrace, mount, clone with new namespaces, etc.) that could
+            # allow container escape.
+            _seccomp_path = Path(__file__).parent.parent / "docker" / "seccomp-etft.json"
+            if _seccomp_path.exists():
+                cmd += ["--security-opt", f"seccomp={_seccomp_path}"]
 
             cmd += [self._image, "python", "/script/run.py"]
 

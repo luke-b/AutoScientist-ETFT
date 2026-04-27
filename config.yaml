@@ -7,7 +7,13 @@
 # Sandbox (isolated execution for generated code)
 # ---------------------------------------------------------------------------
 sandbox:
-  backend: "subprocess"    # "docker" | "subprocess" — docker auto-detected at runtime
+  # "docker" provides full container isolation with seccomp hardening and is
+  # the recommended production setting.  Falls back to subprocess execution
+  # automatically when Docker is unavailable (e.g. in lightweight CI runners).
+  # WARNING: "subprocess" mode runs generated code directly in the host process
+  # with no container boundary — only use it in fully trusted environments or
+  # when Docker is genuinely unavailable.
+  backend: "docker"    # "docker" (recommended) | "subprocess" (unsafe fallback)
   image: "python:3.11-slim"
   mem_limit: "512m"
   cpu_count: 1

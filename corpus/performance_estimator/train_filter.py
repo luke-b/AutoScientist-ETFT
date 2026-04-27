@@ -17,6 +17,7 @@ import numpy as np
 
 from corpus.performance_estimator.dataset_builder import PerfDatasetBuilder
 from corpus.performance_estimator.feature_extractor import feature_names
+from corpus.performance_estimator.filter_model import CURRENT_FEATURE_VERSION
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -74,8 +75,13 @@ def train(data_dir: Path, output_path: Path, cfg: dict | None = None) -> None:
     logger.info("Evaluation on %d test samples:\n%s", len(X_test), report)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, output_path)
-    logger.info("Model saved to %s", output_path)
+    payload = {
+        "model": pipeline,
+        "feature_names": names,
+        "version": CURRENT_FEATURE_VERSION,
+    }
+    joblib.dump(payload, output_path)
+    logger.info("Model saved to %s (feature_version=%d)", output_path, CURRENT_FEATURE_VERSION)
 
 
 def parse_args() -> argparse.Namespace:

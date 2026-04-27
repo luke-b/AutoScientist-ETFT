@@ -14,6 +14,7 @@ from feedback.rl_loop.negative_data_collector import NegativeDataCollector
 from feedback.rl_loop.reward_signal import (
     format_for_context,
     from_experiment_failure,
+    from_physical_eval_failure,
     from_triage_rejection,
 )
 
@@ -56,6 +57,45 @@ class FeedbackRouter:
         logger.info(
             "Routed triage rejection %s → d_perf + d_rationale (reward=%.2f)",
             record.candidate_id, record.reward_signal,
+        )
+        return record
+
+    # ------------------------------------------------------------------
+    def route_physical_eval_failure(
+        self,
+        candidate: SOTAPlusOneCandidate,
+        failure_reason: str,
+        also_rationale: bool = True,
+    ) -> FailureRecord:
+        """
+        Process a candidate that failed physical GPU/cluster evaluation.
+
+        Physical evaluation failures carry a stronger negative reward (-2.0)
+        than micro-experiment failures (-1.0) to reflect the higher cost of
+        committed cluster resources.
+
+        Parameters
+        ----------
+        candidate:
+            The SOTA+1 candidate that failed physical evaluation.
+        failure_reason:
+            Human-readable description of the failure (e.g. "OOM on H100",
+            "divergent training loss after 500 steps").
+        also_rationale:
+            When True (default), also write a rationale training example to
+            𝒟_Rationale so the fine-tuned model learns from this failure.
+
+        Returns
+        -------
+        FailureRecord
+            The persisted failure record (reward_signal = -2.0).
+        """
+        record = from_physical_eval_failure(candidate, failure_reason)
+        self._collector.collect(record, also_rationale=also_rationale)
+        self._reward_log.append(record)
+        logger.warning(
+            "Routed physical eval failure %s → d_perf + d_rationale (reward=%.2f): %s",
+            record.candidate_id, record.reward_signal, failure_reason,
         )
         return record
 

@@ -2,13 +2,74 @@
 feature_extractor.py — Extracts structural features from a Python algorithm.
 
 Features are numeric scalars fed to the sklearn Probabilistic Heuristic Filter.
-All extraction is static (AST-based) so no execution is required.
+All extraction is static (AST-based + TF-IDF) so no execution is required.
+
+Feature set (66 total)
+----------------------
+  AST features (16): classic structural counts derived from the parsed AST.
+  TF-IDF features (50): term-frequency scores for a fixed ML-vocabulary
+      that captures optimizer names, layer types, regularisation terms, and
+      other semantic signals relevant to predicting run-time failures.
 """
 
 from __future__ import annotations
 
 import ast
 import math
+import re
+
+# ---------------------------------------------------------------------------
+# Fixed ML vocabulary for TF-IDF (50 tokens)
+# ---------------------------------------------------------------------------
+
+_ML_VOCAB: list[str] = [
+    # Optimisers
+    "adam", "sgd", "adamw", "adagrad", "rmsprop", "nadam", "adadelta",
+    # Layers / blocks
+    "linear", "conv2d", "conv1d", "batchnorm", "layernorm", "groupnorm",
+    "dropout", "relu", "gelu", "sigmoid", "softmax", "embedding",
+    "transformer", "attention", "lstm", "gru", "rnn",
+    # Regularisation
+    "weight_decay", "l2", "l1", "regularization", "clip_grad",
+    # Training constructs
+    "scheduler", "criterion", "loss", "backward", "optimizer", "zero_grad",
+    "step", "epoch", "batch", "dataloader", "dataset",
+    # Common failure-correlated patterns
+    "cuda", "gpu", "device", "float16", "amp", "autocast",
+    "alloc", "oom", "memory", "nan", "inf",
+    # Architecture scale signals
+    "hidden_size", "num_layers", "num_heads", "d_model",
+]
+
+# Build a term→index mapping once at module level
+_VOCAB_INDEX: dict[str, int] = {term: i for i, term in enumerate(_ML_VOCAB)}
+_N_TFIDF = len(_ML_VOCAB)  # == 50
+
+_TOKEN_RE = re.compile(r"[a-z_][a-z0-9_]*")
+
+
+def _tfidf_features(code: str) -> dict[str, float]:
+    """
+    Compute sublinear TF scores for each term in *_ML_VOCAB*.
+
+    Uses ``tf = 1 + log(count)`` (sublinear TF) when count > 0, 0 otherwise.
+    IDF is omitted because we operate on single documents; the vocabulary
+    itself encodes the domain-relevance signal.
+    """
+    lowered = code.lower()
+    tokens = _TOKEN_RE.findall(lowered)
+    counts: dict[str, int] = {}
+    for tok in tokens:
+        if tok in _VOCAB_INDEX:
+            counts[tok] = counts.get(tok, 0) + 1
+
+    features: dict[str, float] = {}
+    for term in _ML_VOCAB:
+        key = f"tfidf_{term}"
+        cnt = counts.get(term, 0)
+        features[key] = (1.0 + math.log(cnt)) if cnt > 0 else 0.0
+    return features
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -29,7 +90,9 @@ def extract_features(code: str) -> dict[str, float]:
 
     extractor = _Extractor(len(code))
     extractor.visit(tree)
-    return extractor.features()
+    ast_feats = extractor.features()
+    tfidf_feats = _tfidf_features(code)
+    return {**ast_feats, **tfidf_feats}
 
 
 def feature_names() -> list[str]:
@@ -169,7 +232,7 @@ class _Extractor(ast.NodeVisitor):
 
 
 def _zero_features() -> dict[str, float]:
-    return {
+    ast_zeros = {
         "num_functions": 0.0,
         "num_classes": 0.0,
         "num_loops": 0.0,
@@ -187,5 +250,6 @@ def _zero_features() -> dict[str, float]:
         "calls_per_function": 0.0,
         "log_code_chars": 0.0,
     }
-
+    tfidf_zeros = {f"tfidf_{term}": 0.0 for term in _ML_VOCAB}
+    return {**ast_zeros, **tfidf_zeros}
 
