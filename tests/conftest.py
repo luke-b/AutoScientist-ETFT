@@ -53,3 +53,31 @@ def mock_llm_client() -> MagicMock:
     response.content = "mocked LLM response"
     client.complete.return_value = response
     return client
+
+
+# ---------------------------------------------------------------------------
+# Vector store — parametrized over both backends
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(params=["memory", "chroma"])
+def any_vector_store(request, tmp_path: Path):
+    """
+    A VectorStore instance parametrized over both the in-memory and ChromaDB
+    backends.  The chroma variant is automatically skipped when chromadb is
+    not installed.
+    """
+    backend = request.param
+    if backend == "chroma":
+        pytest.importorskip("chromadb")
+        from agents.literature.vector_store import ChromaVectorStore, _OfflineEmbeddingFunction
+
+        return ChromaVectorStore(
+            persist_dir=str(tmp_path / "chroma"),
+            collection_name="test",
+            embedding_function=_OfflineEmbeddingFunction(),
+        )
+
+    from agents.literature.vector_store import InMemoryVectorStore
+
+    return InMemoryVectorStore()

@@ -98,10 +98,13 @@ agents:
 
 # ---------------------------------------------------------------------------
 # Vector Store (persistent RAG memory for literature agents)
+# Set backend to "chroma" and install 'autoscientist-etft[rag]' to retain
+# knowledge across ARL runs.  Use "memory" for ephemeral, single-run use.
+# The persist_dir can be overridden at runtime with VECTOR_STORE_PERSIST_DIR.
 # ---------------------------------------------------------------------------
 vector_store:
-  backend: "memory"             # "chroma" | "memory" (chroma requires pip install chromadb)
-  persist_dir: "./data/vector_store"
+  backend: "memory"             # "chroma" (persistent, requires [rag] extra) | "memory" (transient, default)
+  persist_dir: "./data/vector_store"   # ChromaDB data directory; override with VECTOR_STORE_PERSIST_DIR
   collection: "literature"
   n_results: 20                 # Number of chunks returned per semantic query
 
