@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from corpus.regression_pipeline.cicd_validator import CICDValidator
 from corpus.regression_pipeline.dataset_builder import DatasetBuilder
+from corpus.regression_pipeline.fitness_evaluator import FitnessEvaluator
 from corpus.regression_pipeline.regression_agent import RegressionAgent, _extract_code
 from corpus.regression_pipeline.schemas import (
     RationaleRecord,
@@ -181,3 +182,71 @@ def test_dataset_builder_writes_jsonl(tmp_path):
 
     lines = d_gen_path.read_text().strip().split("\n")
     assert len(lines) == 2  # 3 steps → 2 pairs
+
+
+# ---------------------------------------------------------------------------
+# FitnessEvaluator
+# ---------------------------------------------------------------------------
+
+
+class TestFitnessEvaluator:
+    def test_metric_line_parsed(self):
+        """Script that prints a METRIC line → evaluator returns that value."""
+        evaluator = FitnessEvaluator()
+        script = "print('METRIC: accuracy=0.75')\n"
+        # We need to inject the script as the "code" arg; the evaluator runs it.
+        score = evaluator.evaluate(script, current_fitness=1.0)
+        assert abs(score - 0.75) < 1e-9
+
+    def test_primary_metric_preferred(self):
+        """When the primary metric name is present, it is used over others."""
+        evaluator = FitnessEvaluator(primary_metric="fitness")
+        script = "print('METRIC: accuracy=0.5\\nMETRIC: fitness=0.9')\n"
+        score = evaluator.evaluate(script, current_fitness=1.0)
+        assert abs(score - 0.9) < 1e-9
+
+    def test_fallback_on_failure(self):
+        """A failing script returns current_fitness * fallback_factor."""
+        evaluator = FitnessEvaluator(fallback_factor=0.85)
+        script = "raise RuntimeError('boom')\n"
+        score = evaluator.evaluate(script, current_fitness=1.0)
+        assert abs(score - 0.85) < 1e-9
+
+    def test_fallback_when_no_metrics(self):
+        """A script that succeeds but prints no METRIC lines also falls back."""
+        evaluator = FitnessEvaluator(fallback_factor=0.85)
+        script = "x = 1\n"
+        score = evaluator.evaluate(script, current_fitness=1.0)
+        assert abs(score - 0.85) < 1e-9
+
+    def test_uses_first_metric_when_primary_absent(self):
+        """When primary metric is absent, first available metric is used."""
+        evaluator = FitnessEvaluator(primary_metric="fitness")
+        script = "print('METRIC: loss=0.3')\n"
+        score = evaluator.evaluate(script, current_fitness=1.0)
+        assert abs(score - 0.3) < 1e-9
+
+    def test_custom_fallback_factor(self):
+        """Custom fallback_factor is respected."""
+        evaluator = FitnessEvaluator(fallback_factor=0.5)
+        script = "raise ValueError('x')\n"
+        score = evaluator.evaluate(script, current_fitness=0.8)
+        assert abs(score - 0.4) < 1e-9  # 0.8 * 0.5
+
+    def test_runner_mocked(self):
+        """Evaluator delegates to ExperimentRunner (mock path)."""
+        from corpus.regression_pipeline.schemas import ExperimentResult
+
+        evaluator = FitnessEvaluator.__new__(FitnessEvaluator)
+        evaluator._runner = MagicMock()
+        evaluator._primary_metric = "acc"
+        evaluator._fallback_factor = 0.85
+        evaluator._runner.run.return_value = ExperimentResult(
+            experiment_id="e1",
+            script="",
+            success=True,
+            metrics={"acc": 0.99},
+        )
+        score = evaluator.evaluate("some code", current_fitness=1.0)
+        assert abs(score - 0.99) < 1e-9
+        evaluator._runner.run.assert_called_once_with("some code")

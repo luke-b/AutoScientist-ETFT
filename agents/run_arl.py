@@ -24,6 +24,7 @@ from agents.empirical.runner import ExperimentRunner
 from agents.literature.retriever import LiteratureRetriever
 from agents.literature.searcher import LiteratureSearcher
 from agents.literature.synthesizer import LiteratureSynthesizer
+from agents.literature.vector_store import build_vector_store
 from etft.config import load_config
 
 load_dotenv()
@@ -47,17 +48,20 @@ def run_arl(cfg: dict, bottleneck: str, output_dir: Path) -> dict:
     """
     logger.info("=== Agentic Research Loop | bottleneck=%r ===", bottleneck)
 
+    # --- Build persistent vector store ---
+    vector_store = build_vector_store(cfg)
+
     # --- Phase 1: Literature synthesis ---
     query = f"{bottleneck} deep learning improvement techniques"
     searcher = LiteratureSearcher(cfg)
     papers = searcher.search(query)
     logger.info("Retrieved %d papers.", len(papers))
 
-    retriever = LiteratureRetriever(cfg)
+    retriever = LiteratureRetriever(cfg, vector_store=vector_store)
     chunks = retriever.retrieve_and_chunk(papers)
     logger.info("Produced %d text chunks.", len(chunks))
 
-    synthesizer = LiteratureSynthesizer(cfg)
+    synthesizer = LiteratureSynthesizer(cfg, vector_store=vector_store)
     brief = synthesizer.synthesize(bottleneck, query, chunks, papers)
     logger.info("Research brief: %d hypotheses.", len(brief.hypotheses))
 
