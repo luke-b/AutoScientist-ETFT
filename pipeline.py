@@ -35,7 +35,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-_ALL_STAGES = ("corpus", "analyse", "train", "arl", "generate")
+_ALL_STAGES = ("corpus", "analyse", "train", "calibrate", "arl", "generate")
 
 # ---------------------------------------------------------------------------
 # Pipeline state helpers
@@ -79,6 +79,54 @@ def _log_event(state: dict[str, Any], stage: str, detail: dict[str, Any]) -> Non
 # ---------------------------------------------------------------------------
 # Stage implementations
 # ---------------------------------------------------------------------------
+
+
+def _load_trajectory_steps(data_root: Path, target: str) -> list:
+    """
+    Load ``TrajectoryStep`` objects from the 𝒟_Gen JSONL files for *target*.
+
+    Returns an empty list when no trajectory files are found (the calibration
+    stage will then auto-pass the gate via ``skip_on_short_trajectory``).
+    """
+    import json as _json
+    from corpus.regression_pipeline.schemas import TrajectoryStep
+
+    d_gen_dir = data_root / "d_gen"
+    if not d_gen_dir.exists():
+        logger.debug("[calibrate] No d_gen directory found — returning empty steps list.")
+        return []
+
+    steps: list[TrajectoryStep] = []
+    for path in sorted(d_gen_dir.glob("*.jsonl")):
+        try:
+            with open(path) as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    record = _json.loads(line)
+                    # Each line in a 𝒟_Gen JSONL is a TrajectoryPair; extract both steps
+                    for step_key in ("step_before", "step_after"):
+                        step_data = record.get(step_key)
+                        if step_data and record.get("trajectory_id", "").endswith(target):
+                            try:
+                                steps.append(TrajectoryStep.model_validate(step_data))
+                            except Exception:
+                                pass
+        except Exception as exc:
+            logger.debug("[calibrate] Could not parse %s: %s", path, exc)
+
+    # De-duplicate by (algorithm_id, step_index) and sort
+    seen: set[tuple] = set()
+    unique_steps = []
+    for s in sorted(steps, key=lambda x: x.step_index):
+        key = (s.algorithm_id, s.step_index)
+        if key not in seen:
+            seen.add(key)
+            unique_steps.append(s)
+
+    logger.debug("[calibrate] Loaded %d unique trajectory steps for target '%s'.", len(unique_steps), target)
+    return unique_steps
 
 
 def _run_corpus_stage(
@@ -173,6 +221,86 @@ def _run_train_stage(
     _log_event(state, "train", {"model": model_name, "output_dir": str(output_dir)})
     logger.info("[train] Done. Checkpoint at %s", output_dir)
     return str(output_dir)
+
+
+def _run_calibrate_stage(
+    cfg: dict,
+    trajectory_id: str,
+    steps: list,
+    data_root: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Run the Evolutionary Replay calibration protocol and evaluate the stage-gate.
+
+    When ``calibration.skip_on_short_trajectory`` is True (default) and the
+    trajectory has fewer than ``min_replay_steps + 1`` steps the stage-gate is
+    automatically opened so short PoC trajectories are not blocked.
+
+    Raises ``RuntimeError`` when the gate is closed and the caller must not
+    proceed to synthesis.
+    """
+    from calibration.engine import CalibrationEngine
+
+    cal_cfg = cfg.get("calibration", {})
+    output_dir = Path(cal_cfg.get("output_dir", str(data_root / "calibration")))
+    min_steps = int(cal_cfg.get("min_replay_steps", 2))
+    skip_short = bool(cal_cfg.get("skip_on_short_trajectory", True))
+
+    logger.info("[calibrate] Running Evolutionary Replay for trajectory '%s' …", trajectory_id)
+
+    if skip_short and len(steps) < min_steps + 1:
+        logger.info(
+            "[calibrate] Trajectory has only %d step(s) — gate auto-opened "
+            "(skip_on_short_trajectory=true).",
+            len(steps),
+        )
+        record = {
+            "trajectory_id": trajectory_id,
+            "gate_passed": True,
+            "confidence_level": 1.0,
+            "n_steps_replayed": 0,
+            "skipped": True,
+        }
+        _log_event(state, "calibrate", record)
+        state["calibration"] = record
+        _save_state(state, data_root)
+        return record
+
+    engine = CalibrationEngine(cfg)
+    cal_record = engine.run(
+        trajectory_id=trajectory_id,
+        steps=steps,
+        output_dir=output_dir,
+    )
+
+    record = {
+        "trajectory_id": trajectory_id,
+        "gate_passed": cal_record.gate_passed,
+        "confidence_level": cal_record.confidence_level,
+        "n_steps_replayed": cal_record.n_steps_replayed,
+        "gate_diagnostic": cal_record.gate_diagnostic,
+    }
+    state["calibration"] = record
+    _log_event(state, "calibrate", record)
+
+    if not cal_record.gate_passed:
+        logger.error(
+            "[calibrate] Stage-gate CLOSED — C=%.3f < threshold=%.3f. "
+            "SOTA+x synthesis is blocked. %s",
+            cal_record.confidence_level,
+            cal_record.threshold,
+            cal_record.gate_diagnostic,
+        )
+        raise RuntimeError(
+            f"Calibration stage-gate closed: {cal_record.gate_diagnostic}"
+        )
+
+    logger.info(
+        "[calibrate] Stage-gate OPEN — C=%.3f. Model is Ready for Action.",
+        cal_record.confidence_level,
+    )
+    return record
 
 
 def _run_arl_stage(
@@ -283,7 +411,8 @@ def run_pipeline(
     data_root:
         Root directory for all data outputs (default ``./data``).
     stage:
-        One of ``"corpus"``, ``"train"``, ``"arl"``, ``"generate"``, ``"all"``.
+        One of ``"corpus"``, ``"analyse"``, ``"train"``, ``"calibrate"``,
+        ``"arl"``, ``"generate"``, or ``"all"``.
     resume:
         When *True*, skip stages that are already recorded as completed in
         ``pipeline_state.json``.
@@ -328,6 +457,15 @@ def run_pipeline(
 
         elif current_stage == "train":
             result["train"] = _run_train_stage(cfg, data_root, state)
+
+        elif current_stage == "calibrate":
+            # Load the trajectory steps built during the corpus stage.
+            # Falls back gracefully to an empty list (auto-pass) when corpus
+            # has not yet been built in this run.
+            trajectory_steps = _load_trajectory_steps(data_root, target)
+            result["calibrate"] = _run_calibrate_stage(
+                cfg, f"pipeline_{target}", trajectory_steps, data_root, state
+            )
 
         elif current_stage == "arl":
             arl_summary = _run_arl_stage(cfg, target, data_root, state)

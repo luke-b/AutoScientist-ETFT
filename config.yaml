@@ -76,6 +76,19 @@ corpus:
     n_estimators: 200               # RandomForest trees
 
 # ---------------------------------------------------------------------------
+# Calibration (Recursive Stage-Gate)
+# Runs after corpus-building and before SOTA+x synthesis.
+# The model must replay the evolutionary trajectory with C >= confidence_threshold
+# before the stage-gate opens and synthesis is permitted.
+# ---------------------------------------------------------------------------
+calibration:
+  confidence_threshold: 0.65      # Minimum C = (1/n) Σ Sim(pred, true) to open the gate
+  min_replay_steps: 2             # Minimum trajectory pairs that must be replayed
+  similarity_metric: "composite"  # "composite" | "token_jaccard" | "line_lcs" | "ast_edit"
+  skip_on_short_trajectory: true  # Auto-pass gate for trajectories shorter than min_replay_steps+1
+  output_dir: "./data/calibration" # CalibrationRecord JSON output directory
+
+# ---------------------------------------------------------------------------
 # Analysis
 # ---------------------------------------------------------------------------
 analysis:
