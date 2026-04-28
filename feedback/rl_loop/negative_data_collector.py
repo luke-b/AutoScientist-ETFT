@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 from corpus.regression_pipeline.schemas import FailureRecord, PerfSample
 
 logger = logging.getLogger(__name__)
+
+# Filename that stores FailureRecord objects for RL replay
+_FAILURE_RECORDS_FILE = "failure_records.jsonl"
 
 
 class NegativeDataCollector:
@@ -33,6 +37,9 @@ class NegativeDataCollector:
         """
         Persist *record* to 𝒟_Perf (always) and optionally 𝒟_Rationale.
 
+        Also appends the raw FailureRecord JSON to ``failure_records.jsonl``
+        so it can be replayed across ARL runs via :meth:`iter_records`.
+
         Parameters
         ----------
         record:
@@ -42,8 +49,31 @@ class NegativeDataCollector:
             LLM why this candidate failed.
         """
         self._append_d_perf(record)
+        self._append_failure_record(record)
         if also_rationale:
             self._append_d_rationale(record)
+
+    # ------------------------------------------------------------------
+    def iter_records(self) -> Iterator[FailureRecord]:
+        """
+        Yield :class:`FailureRecord` objects previously persisted by
+        :meth:`collect`.
+
+        Reads ``d_perf/failure_records.jsonl`` line by line so the full
+        history can be replayed into a new :class:`FeedbackRouter` across
+        ARL runs without loading the entire file into memory at once.
+        """
+        records_path = self._d_perf_dir / _FAILURE_RECORDS_FILE
+        if not records_path.exists():
+            return
+        with open(records_path) as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    try:
+                        yield FailureRecord.model_validate_json(line)
+                    except Exception as exc:
+                        logger.warning("Skipping malformed FailureRecord line: %s", exc)
 
     # ------------------------------------------------------------------
     def _append_d_perf(self, record: FailureRecord) -> None:
@@ -60,6 +90,14 @@ class NegativeDataCollector:
         with open(out_path, "a") as f:
             f.write(sample.model_dump_json() + "\n")
         logger.debug("Appended failure to %s", out_path)
+
+    # ------------------------------------------------------------------
+    def _append_failure_record(self, record: FailureRecord) -> None:
+        """Persist the raw FailureRecord for cross-run RL replay."""
+        out_path = self._d_perf_dir / _FAILURE_RECORDS_FILE
+        with open(out_path, "a") as f:
+            f.write(record.model_dump_json() + "\n")
+        logger.debug("Appended FailureRecord to %s", out_path)
 
     # ------------------------------------------------------------------
     def _append_d_rationale(self, record: FailureRecord) -> None:

@@ -145,3 +145,75 @@ def test_router_rl_context_prefix(tmp_path):
 def test_router_empty_context_prefix(tmp_path):
     router = FeedbackRouter(data_root=tmp_path)
     assert router.build_rl_context_prefix() == ""
+
+
+# ---------------------------------------------------------------------------
+# Multi-run RL persistence
+# ---------------------------------------------------------------------------
+
+
+def test_collector_iter_records_empty(tmp_path):
+    """iter_records yields nothing when no records have been persisted."""
+    collector = NegativeDataCollector(tmp_path)
+    assert list(collector.iter_records()) == []
+
+
+def test_collector_iter_records_roundtrip(tmp_path):
+    """Records persisted via collect() are exactly recoverable via iter_records()."""
+    collector = NegativeDataCollector(tmp_path)
+    record1 = from_experiment_failure(_failed_experiment())
+    record2 = from_triage_rejection(_rejected_candidate())
+    collector.collect(record1)
+    collector.collect(record2)
+
+    replayed = list(collector.iter_records())
+    assert len(replayed) == 2
+    assert replayed[0].source == "micro_experiment"
+    assert replayed[1].source == "triage"
+    assert replayed[0].experiment_id == record1.experiment_id
+
+
+def test_feedback_router_load_history(tmp_path):
+    """FeedbackRouter with load_history=True pre-populates reward_log from disk."""
+    # Populate history in a first router instance
+    router1 = FeedbackRouter(data_root=tmp_path)
+    router1.route_experiment_failure(_failed_experiment())
+    router1.route_triage_failure(_rejected_candidate())
+    assert len(router1.reward_log) == 2
+
+    # New router instance should load the 2 persisted records
+    router2 = FeedbackRouter(data_root=tmp_path, load_history=True)
+    assert len(router2.reward_log) == 2
+
+
+def test_feedback_router_load_from_disk(tmp_path):
+    """FeedbackRouter.load_from_disk() factory returns router with history loaded."""
+    router1 = FeedbackRouter(data_root=tmp_path)
+    router1.route_experiment_failure(_failed_experiment())
+
+    router2 = FeedbackRouter.load_from_disk(data_root=tmp_path)
+    assert len(router2.reward_log) == 1
+    assert router2.reward_log[0].source == "micro_experiment"
+
+
+def test_feedback_router_load_history_nonempty_prefix(tmp_path):
+    """After loading history the RL prefix is non-empty on a fresh router instance."""
+    # Seed history
+    seeder = FeedbackRouter(data_root=tmp_path)
+    seeder.route_experiment_failure(_failed_experiment())
+
+    # New run — should see prior negative signal immediately
+    router = FeedbackRouter(data_root=tmp_path, load_history=True)
+    prefix = router.build_rl_context_prefix()
+    assert "IN-CONTEXT RL FEEDBACK" in prefix
+    assert "NEGATIVE FEEDBACK" in prefix
+
+
+def test_feedback_router_no_history_empty_prefix(tmp_path):
+    """Without load_history the prefix starts empty even if disk has records."""
+    # Seed history
+    seeder = FeedbackRouter(data_root=tmp_path)
+    seeder.route_experiment_failure(_failed_experiment())
+
+    router = FeedbackRouter(data_root=tmp_path, load_history=False)
+    assert router.build_rl_context_prefix() == ""

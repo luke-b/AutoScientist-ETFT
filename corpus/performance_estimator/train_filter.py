@@ -23,8 +23,22 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
-def train(data_dir: Path, output_path: Path, cfg: dict | None = None) -> None:
-    """Load all 𝒟_Perf JSONL files and train a RandomForestClassifier."""
+def train(data_dir: Path, output_path: Path, cfg: dict | None = None, bootstrap: bool = False) -> None:
+    """
+    Load all 𝒟_Perf JSONL files and train a RandomForestClassifier.
+
+    Parameters
+    ----------
+    data_dir:
+        Directory containing ``*.jsonl`` 𝒟_Perf files.
+    output_path:
+        Destination path for the serialised model payload.
+    cfg:
+        Optional runtime configuration dict.
+    bootstrap:
+        When *True* and *data_dir* contains fewer than 10 samples,
+        synthetic bootstrap data is generated automatically before training.
+    """
     try:
         import joblib
         from sklearn.ensemble import RandomForestClassifier
@@ -39,6 +53,22 @@ def train(data_dir: Path, output_path: Path, cfg: dict | None = None) -> None:
     test_size = float(estimator_cfg.get("test_size", 0.2))
     random_state = int(estimator_cfg.get("random_state", 42))
     n_estimators = int(estimator_cfg.get("n_estimators", 200))
+
+    # Auto-bootstrap if requested and data is sparse
+    if bootstrap:
+        existing = []
+        if data_dir.exists():
+            for jf in sorted(data_dir.glob("*.jsonl")):
+                existing.extend(PerfDatasetBuilder.load(jf))
+        if len(existing) < 10:
+            from corpus.performance_estimator.bootstrap import generate_bootstrap_data
+            bootstrap_path = data_dir / "bootstrap.jsonl"
+            logger.info(
+                "Bootstrap flag set and only %d existing samples found — "
+                "generating synthetic bootstrap data at %s",
+                len(existing), bootstrap_path,
+            )
+            generate_bootstrap_data(bootstrap_path, n_samples=100)
 
     # Load samples
     samples = []
@@ -89,6 +119,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", default="./data/d_perf", help="Directory with 𝒟_Perf JSONL files.")
     parser.add_argument("--output", default="./checkpoints/perf_filter.joblib", help="Output model path.")
     parser.add_argument("--config", default="config.yaml")
+    parser.add_argument(
+        "--bootstrap",
+        action="store_true",
+        default=False,
+        help=(
+            "Auto-generate synthetic 𝒟_Perf bootstrap data when the data directory "
+            "contains fewer than 10 samples before training."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -96,7 +135,7 @@ def main() -> None:
     from etft.config import load_config
     args = parse_args()
     cfg = load_config(args.config)
-    train(Path(args.data), Path(args.output), cfg)
+    train(Path(args.data), Path(args.output), cfg, bootstrap=args.bootstrap)
 
 
 if __name__ == "__main__":

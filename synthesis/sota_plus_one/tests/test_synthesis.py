@@ -233,20 +233,29 @@ def test_local_adapter_failure_raises():
         adapter.submit(_make_candidate(_FAILING_SCRIPT))
 
 
-def test_slurm_adapter_raises_not_implemented():
+def test_slurm_adapter_raises_on_missing_sbatch():
+    """SlurmAdapter raises RuntimeError (not NotImplementedError) when sbatch is absent."""
+    from unittest.mock import patch
+
     from synthesis.sota_plus_one.cluster_adapter import SlurmAdapter
 
     adapter = SlurmAdapter()
-    with pytest.raises(NotImplementedError):
-        adapter.submit(_make_candidate())
+    with patch("subprocess.run", side_effect=FileNotFoundError("sbatch not found")):
+        with pytest.raises(RuntimeError, match="sbatch not found"):
+            adapter.submit(_make_candidate())
 
 
-def test_kubernetes_adapter_raises_not_implemented():
+def test_kubernetes_adapter_raises_on_missing_package():
+    """KubernetesAdapter raises ImportError when the kubernetes package is absent."""
+    import sys
+    from unittest.mock import patch
+
     from synthesis.sota_plus_one.cluster_adapter import KubernetesAdapter
 
     adapter = KubernetesAdapter()
-    with pytest.raises(NotImplementedError):
-        adapter.submit(_make_candidate())
+    with patch.dict(sys.modules, {"kubernetes": None}):
+        with pytest.raises((ImportError, TypeError)):
+            adapter._k8s_clients()
 
 
 # ---------------------------------------------------------------------------
@@ -289,3 +298,161 @@ def test_physical_eval_failure_in_rl_context(tmp_path: Path) -> None:
     assert "physical_eval" in prefix
     assert "divergent loss" in prefix
     assert "reward=-2.00" in prefix
+
+
+# ---------------------------------------------------------------------------
+# ClusterSubmissionAdapter tests
+# ---------------------------------------------------------------------------
+
+
+def _make_cluster_candidate(code: str = "print('METRIC: acc=1.0')\n") -> SOTAPlusOneCandidate:
+    return SOTAPlusOneCandidate(
+        candidate_id="cand_test",
+        trajectory_id="traj_test",
+        code=code,
+        rationale="Test candidate.",
+        triage_passed=True,
+    )
+
+
+def test_local_adapter_success(tmp_path):
+    """LocalSubprocessAdapter returns a job_id string on success."""
+    from unittest.mock import MagicMock, patch
+
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter.__new__(LocalSubprocessAdapter)
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "METRIC: acc=1.0"
+    mock_result.stderr = ""
+    adapter._sandbox = MagicMock()
+    adapter._sandbox.run_script.return_value = mock_result
+    adapter._timeout = 60
+
+    job_id = adapter.submit(_make_cluster_candidate())
+    assert job_id.startswith("local-")
+
+
+def test_local_adapter_failure_raises(tmp_path):
+    """LocalSubprocessAdapter raises RuntimeError on non-zero exit code."""
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter.__new__(LocalSubprocessAdapter)
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stderr = "RuntimeError: boom"
+    adapter._sandbox = MagicMock()
+    adapter._sandbox.run_script.return_value = mock_result
+    adapter._timeout = 60
+
+    import pytest
+    with pytest.raises(RuntimeError, match="exit code 1"):
+        adapter.submit(_make_cluster_candidate())
+
+
+def test_local_adapter_timeout_raises():
+    """LocalSubprocessAdapter raises RuntimeError on timeout (returncode=124)."""
+    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+
+    adapter = LocalSubprocessAdapter.__new__(LocalSubprocessAdapter)
+    mock_result = MagicMock()
+    mock_result.returncode = 124
+    mock_result.stderr = ""
+    adapter._sandbox = MagicMock()
+    adapter._sandbox.run_script.return_value = mock_result
+    adapter._timeout = 60
+
+    import pytest
+    with pytest.raises(RuntimeError, match="timed out"):
+        adapter.submit(_make_cluster_candidate())
+
+
+def test_slurm_adapter_no_sbatch_raises():
+    """SlurmAdapter raises RuntimeError when sbatch is not on PATH."""
+    from unittest.mock import patch
+
+    from synthesis.sota_plus_one.cluster_adapter import SlurmAdapter
+
+    adapter = SlurmAdapter()
+
+    with patch(
+        "subprocess.run",
+        side_effect=FileNotFoundError("sbatch not found"),
+    ):
+        import pytest
+        with pytest.raises(RuntimeError, match="sbatch not found"):
+            adapter.submit(_make_cluster_candidate())
+
+
+def test_slurm_adapter_sbatch_failure_raises():
+    """SlurmAdapter raises RuntimeError when sbatch returns non-zero."""
+    import subprocess
+    from unittest.mock import patch
+
+    from synthesis.sota_plus_one.cluster_adapter import SlurmAdapter
+
+    adapter = SlurmAdapter()
+
+    with patch(
+        "subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, "sbatch", stderr="Invalid partition"),
+    ):
+        import pytest
+        with pytest.raises(RuntimeError, match="sbatch submission failed"):
+            adapter.submit(_make_cluster_candidate())
+
+
+def test_kubernetes_adapter_missing_package():
+    """KubernetesAdapter._k8s_clients() raises ImportError when kubernetes not installed."""
+    import sys
+    from unittest.mock import patch
+
+    from synthesis.sota_plus_one.cluster_adapter import KubernetesAdapter
+
+    adapter = KubernetesAdapter()
+
+    with patch.dict(sys.modules, {"kubernetes": None}):
+        import pytest
+        with pytest.raises((ImportError, TypeError)):
+            adapter._k8s_clients()
+
+
+def test_kubernetes_adapter_build_manifest_structure():
+    """_build_job_manifest returns a valid batch/v1 Job manifest dict."""
+    from synthesis.sota_plus_one.cluster_adapter import KubernetesAdapter
+
+    adapter = KubernetesAdapter(cfg={
+        "cluster": {
+            "k8s": {
+                "namespace": "test-ns",
+                "image": "python:3.11",
+                "gpu_count": 2,
+                "memory_limit": "16Gi",
+                "cpu_limit": "8",
+            }
+        }
+    })
+
+    manifest = adapter._build_job_manifest("test-job", "test-script-cm")
+
+    assert manifest["kind"] == "Job"
+    assert manifest["apiVersion"] == "batch/v1"
+    assert manifest["metadata"]["name"] == "test-job"
+    assert manifest["metadata"]["namespace"] == "test-ns"
+    container = manifest["spec"]["template"]["spec"]["containers"][0]
+    assert container["image"] == "python:3.11"
+    limits = container["resources"]["limits"]
+    assert limits["nvidia.com/gpu"] == "2"
+    assert limits["memory"] == "16Gi"
+    assert "candidate.py" in container["command"][-1]
+
+
+def test_kubernetes_adapter_zero_gpus_no_gpu_limit():
+    """When gpu_count=0 the manifest must not include an nvidia.com/gpu limit."""
+    from synthesis.sota_plus_one.cluster_adapter import KubernetesAdapter
+
+    adapter = KubernetesAdapter(cfg={"cluster": {"k8s": {"gpu_count": 0}}})
+    manifest = adapter._build_job_manifest("j", "cm")
+    container = manifest["spec"]["template"]["spec"]["containers"][0]
+    assert "nvidia.com/gpu" not in container["resources"]["limits"]
