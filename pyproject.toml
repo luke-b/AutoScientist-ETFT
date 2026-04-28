@@ -78,6 +78,6 @@ select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "corpus", "agents", "analysis", "synthesis", "feedback"]
+testpaths = ["tests", "corpus", "agents", "analysis", "synthesis", "feedback", "calibration"]
 addopts = "--tb=short"
 pythonpath = ["."]

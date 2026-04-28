@@ -8,7 +8,7 @@ agents, and synthesis modules.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +45,14 @@ class TrajectoryStep(BaseModel):
     code: str = Field(..., description="Full source code of the algorithm.")
     fitness_score: float = Field(
         ..., description="Objective fitness ℱ(a); higher is better."
+    )
+    split: str = Field(
+        "train",
+        description=(
+            "Dataset split this step belongs to: 'train' (used for fine-tuning) or "
+            "'calibration' (held-out, used exclusively by the Evolutionary Replay protocol). "
+            "Set via held_out_frac in _load_trajectory_steps."
+        ),
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -199,11 +207,12 @@ class ReconstructionResult(BaseModel):
     step_index_after: int
     predicted_code: str = Field(..., description="Code reconstructed by the model.")
     true_code: str = Field(..., description="Ground-truth successor code from the trajectory.")
-    similarity_score: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Sim(a_pred_i, a_true_i) ∈ [0, 1]; higher is better.",
+    similarity_score: Optional[float] = Field(
+        None,
+        description=(
+            "Sim(a_pred_i, a_true_i) ∈ [0, 1]; higher is better. "
+            "None when the agent call failed and no score could be computed."
+        ),
     )
     agent_success: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -224,15 +233,32 @@ class CalibrationRecord(BaseModel):
     trajectory_id: str
     timestamp: str = Field(..., description="UTC ISO-8601 timestamp of the calibration run.")
     n_steps_replayed: int
-    confidence_level: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="C = (1/n) Σ Sim(a_pred_i, a_true_i) [Eq. 1, Benda 2026].",
+    n_steps_attempted: int = Field(
+        0,
+        description="Total number of step pairs attempted (including agent failures).",
+    )
+    n_agent_failures: int = Field(
+        0,
+        description="Number of step pairs where the agent call returned success=False.",
+    )
+    confidence_level: Optional[float] = Field(
+        None,
+        description=(
+            "C = (1/n) Σ Sim(a_pred_i, a_true_i) [Eq. 1, Benda 2026]. "
+            "None when the calibration run was skipped (short trajectory)."
+        ),
     )
     threshold: float = Field(..., description="Minimum C required for gate_passed=True.")
     gate_passed: bool = Field(
         ..., description="True when C ≥ threshold — SOTA+x synthesis is unlocked."
+    )
+    gate_status: str = Field(
+        "evaluated",
+        description=(
+            "'evaluated' — normal run; "
+            "'skipped' — short-trajectory auto-pass (confidence_level is None); "
+            "'agent_failure' — too many agent failures to evaluate."
+        ),
     )
     gate_diagnostic: str = Field(
         "", description="Human-readable explanation of the gate decision."
