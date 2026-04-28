@@ -1361,20 +1361,26 @@ def build_all(output_root: Path | None = None) -> None:
     """
     Write all six evolutionary dataset files under *output_root*.
 
+    These are authored seed datasets and are written to the ``seed/``
+    sub-directory so they are tracked by version control separately from
+    the ephemeral auto-generated datasets in ``d_gen/``, ``d_rationale/``,
+    and ``d_perf/``.
+
     Directory layout::
 
         <output_root>/
-            d_rationale/
-                tinyml_timeseries_rationale.jsonl
-                llm_evolution_rationale.jsonl
-            d_pareto/
-                tinyml_timeseries_pareto.jsonl
-                llm_evolution_pareto.jsonl
-            d_perf/
-                tinyml_timeseries_perf.jsonl
-                llm_evolution_perf.jsonl
+            seed/
+                d_rationale/
+                    tinyml_timeseries_rationale.jsonl
+                    llm_evolution_rationale.jsonl
+                d_pareto/
+                    tinyml_timeseries_pareto.jsonl
+                    llm_evolution_pareto.jsonl
+                d_perf/
+                    tinyml_timeseries_perf.jsonl
+                    llm_evolution_perf.jsonl
     """
-    root = output_root or Path(__file__).resolve().parents[2] / "data"
+    root = output_root or Path(__file__).resolve().parents[2] / "data" / "seed"
 
     _write_jsonl(root / "d_rationale" / "tinyml_timeseries_rationale.jsonl", TINYML_RATIONALE)
     _write_jsonl(root / "d_rationale" / "llm_evolution_rationale.jsonl", LLM_RATIONALE)
@@ -1383,7 +1389,7 @@ def build_all(output_root: Path | None = None) -> None:
     _write_jsonl(root / "d_perf" / "tinyml_timeseries_perf.jsonl", TINYML_PERF)
     _write_jsonl(root / "d_perf" / "llm_evolution_perf.jsonl", LLM_PERF)
 
-    logger.info("All 6 evolutionary datasets written to %s", root)
+    logger.info("All 6 evolutionary seed datasets written to %s", root)
 
 
 if __name__ == "__main__":
