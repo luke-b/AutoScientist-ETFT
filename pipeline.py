@@ -81,9 +81,25 @@ def _log_event(state: dict[str, Any], stage: str, detail: dict[str, Any]) -> Non
 # ---------------------------------------------------------------------------
 
 
-def _load_trajectory_steps(data_root: Path, target: str) -> list:
+def _load_trajectory_steps(
+    data_root: Path,
+    target: str,
+    held_out_frac: float = 0.0,
+) -> list:
     """
     Load ``TrajectoryStep`` objects from the 𝒟_Gen JSONL files for *target*.
+
+    Parameters
+    ----------
+    data_root:
+        Root data directory containing ``d_gen/``.
+    target:
+        Algorithm family label used to filter trajectories.
+    held_out_frac:
+        Fraction of trajectory steps (from the end of each sorted trajectory)
+        that should be tagged ``split="calibration"`` instead of ``split="train"``.
+        When 0.0 (default) all steps remain ``"train"``-split, which is the
+        backwards-compatible behaviour.
 
     Returns an empty list when no trajectory files are found (the calibration
     stage will then auto-pass the gate via ``skip_on_short_trajectory``).
@@ -97,7 +113,10 @@ def _load_trajectory_steps(data_root: Path, target: str) -> list:
         return []
 
     steps: list[TrajectoryStep] = []
+    total_skipped = 0
     for path in sorted(d_gen_dir.glob("*.jsonl")):
+        file_records = 0
+        file_skipped = 0
         try:
             with open(path) as fh:
                 for line in fh:
@@ -109,12 +128,29 @@ def _load_trajectory_steps(data_root: Path, target: str) -> list:
                     for step_key in ("step_before", "step_after"):
                         step_data = record.get(step_key)
                         if step_data and record.get("trajectory_id", "").endswith(target):
+                            file_records += 1
                             try:
                                 steps.append(TrajectoryStep.model_validate(step_data))
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                file_skipped += 1
+                                logger.warning(
+                                    "[calibrate] Skipping malformed step in %s: %s",
+                                    path, exc,
+                                )
         except Exception as exc:
             logger.debug("[calibrate] Could not parse %s: %s", path, exc)
+            continue
+
+        total_skipped += file_skipped
+        if file_records > 0 and file_skipped > file_records * 0.5:
+            raise RuntimeError(
+                f"[calibrate] More than 50% of records in {path} failed to parse "
+                f"({file_skipped}/{file_records}). "
+                "Aborting to prevent silent data loss — inspect the JSONL file."
+            )
+
+    if total_skipped:
+        logger.warning("[calibrate] Total malformed steps skipped: %d", total_skipped)
 
     # De-duplicate by (algorithm_id, step_index) and sort
     seen: set[tuple] = set()
@@ -124,6 +160,18 @@ def _load_trajectory_steps(data_root: Path, target: str) -> list:
         if key not in seen:
             seen.add(key)
             unique_steps.append(s)
+
+    # A1: tag the last k steps of each trajectory as "calibration" split
+    if held_out_frac > 0.0 and unique_steps:
+        k = max(1, int(round(len(unique_steps) * held_out_frac)))
+        for step in unique_steps[:-k]:
+            step.split = "train"
+        for step in unique_steps[-k:]:
+            step.split = "calibration"
+        logger.info(
+            "[calibrate] Held-out split: %d train / %d calibration steps (held_out_frac=%.2f).",
+            len(unique_steps) - k, k, held_out_frac,
+        )
 
     logger.debug("[calibrate] Loaded %d unique trajectory steps for target '%s'.", len(unique_steps), target)
     return unique_steps
@@ -255,11 +303,16 @@ def _run_calibrate_stage(
             "(skip_on_short_trajectory=true).",
             len(steps),
         )
+        # B3: use None for confidence_level and "skipped" gate_status to avoid
+        # polluting calibration statistics with a synthetic C=1.0
         record = {
             "trajectory_id": trajectory_id,
             "gate_passed": True,
-            "confidence_level": 1.0,
+            "gate_status": "skipped",
+            "confidence_level": None,
             "n_steps_replayed": 0,
+            "n_steps_attempted": 0,
+            "n_agent_failures": 0,
             "skipped": True,
         }
         _log_event(state, "calibrate", record)
@@ -277,8 +330,11 @@ def _run_calibrate_stage(
     record = {
         "trajectory_id": trajectory_id,
         "gate_passed": cal_record.gate_passed,
+        "gate_status": cal_record.gate_status,
         "confidence_level": cal_record.confidence_level,
         "n_steps_replayed": cal_record.n_steps_replayed,
+        "n_steps_attempted": cal_record.n_steps_attempted,
+        "n_agent_failures": cal_record.n_agent_failures,
         "gate_diagnostic": cal_record.gate_diagnostic,
     }
     state["calibration"] = record
@@ -286,9 +342,9 @@ def _run_calibrate_stage(
 
     if not cal_record.gate_passed:
         logger.error(
-            "[calibrate] Stage-gate CLOSED — C=%.3f < threshold=%.3f. "
+            "[calibrate] Stage-gate CLOSED — C=%s < threshold=%.3f. "
             "SOTA+x synthesis is blocked. %s",
-            cal_record.confidence_level,
+            f"{cal_record.confidence_level:.3f}" if cal_record.confidence_level is not None else "N/A",
             cal_record.threshold,
             cal_record.gate_diagnostic,
         )
@@ -297,8 +353,8 @@ def _run_calibrate_stage(
         )
 
     logger.info(
-        "[calibrate] Stage-gate OPEN — C=%.3f. Model is Ready for Action.",
-        cal_record.confidence_level,
+        "[calibrate] Stage-gate OPEN — C=%s. Model is Ready for Action.",
+        f"{cal_record.confidence_level:.3f}" if cal_record.confidence_level is not None else "N/A",
     )
     return record
 
@@ -462,7 +518,9 @@ def run_pipeline(
             # Load the trajectory steps built during the corpus stage.
             # Falls back gracefully to an empty list (auto-pass) when corpus
             # has not yet been built in this run.
-            trajectory_steps = _load_trajectory_steps(data_root, target)
+            cal_cfg = cfg.get("calibration", {})
+            held_out_frac = float(cal_cfg.get("held_out_frac", 0.0))
+            trajectory_steps = _load_trajectory_steps(data_root, target, held_out_frac)
             result["calibrate"] = _run_calibrate_stage(
                 cfg, f"pipeline_{target}", trajectory_steps, data_root, state
             )

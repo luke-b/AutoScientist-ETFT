@@ -84,9 +84,52 @@ corpus:
 calibration:
   confidence_threshold: 0.65      # Minimum C = (1/n) Σ Sim(pred, true) to open the gate
   min_replay_steps: 2             # Minimum trajectory pairs that must be replayed
-  similarity_metric: "composite"  # "composite" | "token_jaccard" | "line_lcs" | "ast_edit"
+  similarity_metric: "composite"  # "composite" | "token_jaccard" | "line_lcs" | "ast_edit" | "ast_node_sequence"
   skip_on_short_trajectory: true  # Auto-pass gate for trajectories shorter than min_replay_steps+1
   output_dir: "./data/calibration" # CalibrationRecord JSON output directory
+
+  # --- B1: Prompt code truncation limit -----------------------------------
+  # Maximum characters from before.code included in the reconstruction prompt.
+  # Hard-coded 4000 is replaced by this configurable limit.  Set higher for
+  # large algorithm files; lower to reduce token costs.
+  max_code_chars: 8000
+
+  # --- A4: Per-step minimum similarity floor ------------------------------
+  # Even if the mean C ≥ threshold, the gate closes when any individual step
+  # similarity falls below this floor.  Set to 0.0 to disable.
+  min_step_similarity: 0.35
+
+  # --- A4: Recency weighting ----------------------------------------------
+  # When true, later trajectory steps receive linearly higher weight when
+  # computing C (step n weighted n / Σ(1..n)).  False = unweighted mean.
+  recency_weighting: false
+
+  # --- B2: Agent failure rate gate ----------------------------------------
+  # Maximum fraction of attempted steps that may fail before the gate closes
+  # with an "agent_failure" diagnostic instead of a low-C diagnostic.
+  max_agent_failure_rate: 0.5
+
+  # --- A3: Blind reconstruction mode --------------------------------------
+  # When true, the prompt omits exact delta values and the causal explanation,
+  # replacing them with ordinal descriptions ("moderate improvement in loss").
+  # Useful for quantifying prompt leakage.  Default false for compatibility.
+  blind_mode: false
+
+  # --- C1: Composite metric weights ---------------------------------------
+  # (w_jaccard, w_lcs, w_ast) — must sum to 1.0.
+  # Controls the relative contribution of each sub-metric in "composite" mode.
+  similarity_weights: [0.4, 0.3, 0.3]
+
+  # --- A1: Held-out calibration split -------------------------------------
+  # Fraction of trajectory steps (from the end) tagged as "calibration" split
+  # and used exclusively by Evolutionary Replay (excluded from training).
+  # Set to 0.0 (default) to disable held-out splitting (all steps = "train").
+  held_out_frac: 0.0
+
+  # --- C3: Non-contiguous step gap limit ----------------------------------
+  # Maximum allowed step index gap between adjacent replay pairs.  Pairs with
+  # a larger gap are skipped.  null = no limit.
+  max_step_gap: null
 
 # ---------------------------------------------------------------------------
 # Analysis

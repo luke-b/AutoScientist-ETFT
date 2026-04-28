@@ -5,6 +5,7 @@ calibration/tests/test_similarity.py — Unit tests for similarity metrics.
 import pytest
 from calibration.similarity import (
     ast_edit,
+    ast_node_sequence,
     code_similarity,
     line_lcs,
     token_jaccard,
@@ -35,6 +36,21 @@ class SimpleNet(nn.Module):
 """
 
 _CODE_NEAR_IDENTICAL = _CODE_A + "\n# added comment\n"
+
+# Two structurally different snippets that share the same *flat* node-type bag.
+# A bare ``return x`` and a ``return x`` inside an if-block both produce
+# 'Return' and 'Name' nodes, but their parent context differs.
+_CODE_BARE_RETURN = """\
+def f(x):
+    return x
+"""
+
+_CODE_CONDITIONAL_RETURN = """\
+def f(x):
+    if x:
+        return x
+    return None
+"""
 
 
 class TestTokenJaccard:
@@ -71,12 +87,47 @@ class TestLineLCS:
         assert score > 0.85
 
 
+class TestASTNodeSequence:
+    """Tests for the (fast, flat) ast_node_sequence metric."""
+
+    def test_identical(self):
+        assert ast_node_sequence(_CODE_A, _CODE_A) == pytest.approx(1.0)
+
+    def test_invalid_syntax(self):
+        assert ast_node_sequence("def broken(", _CODE_A) == pytest.approx(0.0)
+
+    def test_empty_both(self):
+        assert ast_node_sequence("", "") == pytest.approx(1.0)
+
+    def test_structurally_similar(self):
+        code_c = """\
+def train(x, y, lr=0.001):
+    weights = [0.0] * len(x[0])
+    for epoch in range(50):
+        for xi, yi in zip(x, y):
+            pred = sum(w * v for w, v in zip(weights, xi))
+            err = yi - pred
+            weights = [w + lr * err * v for w, v in zip(weights, xi)]
+    return weights
+"""
+        score = ast_node_sequence(_CODE_A, code_c)
+        assert score > 0.85
+
+    def test_in_unit_range(self):
+        assert 0.0 <= ast_node_sequence(_CODE_A, _CODE_B) <= 1.0
+
+
 class TestASTEdit:
+    """Tests for the structurally-aware (parent-annotated) ast_edit metric."""
+
     def test_identical(self):
         assert ast_edit(_CODE_A, _CODE_A) == pytest.approx(1.0)
 
     def test_invalid_syntax(self):
         assert ast_edit("def broken(", _CODE_A) == pytest.approx(0.0)
+
+    def test_empty_both(self):
+        assert ast_edit("", "") == pytest.approx(1.0)
 
     def test_structurally_similar(self):
         code_c = """\
@@ -91,6 +142,22 @@ def train(x, y, lr=0.001):
 """
         score = ast_edit(_CODE_A, code_c)
         assert score > 0.85
+
+    def test_in_unit_range(self):
+        assert 0.0 <= ast_edit(_CODE_A, _CODE_B) <= 1.0
+
+    def test_structural_sensitivity(self):
+        """
+        ast_edit must distinguish structurally different code that shares the
+        same flat node-type bag.  A bare 'return x' and a 'return x' inside
+        an 'if' block should score below the identical-structure baseline.
+        """
+        score_identical = ast_edit(_CODE_BARE_RETURN, _CODE_BARE_RETURN)
+        score_different = ast_edit(_CODE_BARE_RETURN, _CODE_CONDITIONAL_RETURN)
+        assert score_identical > score_different, (
+            "ast_edit should penalise structural differences; "
+            f"got identical={score_identical:.3f}, different={score_different:.3f}"
+        )
 
 
 class TestCodeSimilarity:
@@ -110,4 +177,9 @@ class TestCodeSimilarity:
 
     def test_in_unit_range(self):
         score = code_similarity(_CODE_A, _CODE_B)
+        assert 0.0 <= score <= 1.0
+
+    def test_custom_weights(self):
+        """Weights are accepted and the result remains in [0, 1]."""
+        score = code_similarity(_CODE_A, _CODE_B, weights=(0.5, 0.3, 0.2))
         assert 0.0 <= score <= 1.0
