@@ -62,6 +62,8 @@ etft-generate = "synthesis.sota_plus_one.generate:main"
 etft-bootstrap-filter = "corpus.performance_estimator.bootstrap:main"
 etft-pipeline = "pipeline:main"
 etft-report = "reporting:main"
+etft-analyse = "analysis.pareto_delta.run:main"
+etft-agent = "etft.agent_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -489,3 +489,49 @@ class KubernetesAdapter(ClusterSubmissionAdapter):
                 )
             except Exception as exc:
                 logger.debug("Failed to delete Job %s: %s", job_name, exc)
+
+
+# ---------------------------------------------------------------------------
+# Factory
+# ---------------------------------------------------------------------------
+
+_ADAPTER_MAP: dict[str, type[ClusterSubmissionAdapter]] = {
+    "local": LocalSubprocessAdapter,
+    "slurm": SlurmAdapter,
+    "kubernetes": KubernetesAdapter,
+}
+
+_VALID_ADAPTERS = tuple(_ADAPTER_MAP.keys())
+
+
+def get_adapter(cfg: dict | None = None) -> ClusterSubmissionAdapter:
+    """
+    Return the :class:`ClusterSubmissionAdapter` configured in *cfg*.
+
+    Reads ``cfg['cluster']['adapter']`` (default ``"local"``) and returns the
+    corresponding adapter instance.
+
+    Parameters
+    ----------
+    cfg:
+        Full runtime configuration dict.
+
+    Returns
+    -------
+    ClusterSubmissionAdapter
+        An instantiated adapter ready for use.
+
+    Raises
+    ------
+    ValueError
+        When the configured adapter name is not one of the valid options.
+    """
+    adapter_name: str = (cfg or {}).get("cluster", {}).get("adapter", "local")
+    adapter_cls = _ADAPTER_MAP.get(adapter_name)
+    if adapter_cls is None:
+        raise ValueError(
+            f"Unknown cluster adapter {adapter_name!r}. "
+            f"Valid options are: {list(_VALID_ADAPTERS)}"
+        )
+    logger.debug("get_adapter: using %r → %s", adapter_name, adapter_cls.__name__)
+    return adapter_cls(cfg)
