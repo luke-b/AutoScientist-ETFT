@@ -154,8 +154,6 @@ class ReplaySession:
         ``self._failed_results`` but is **not** appended to ``self.results``
         so it does not bias the mean confidence level.
         """
-        self.n_steps_attempted += 1
-
         # ---- C3: non-contiguous step gap check ----
         gap = after.step_index - before.step_index
         if gap > 1:
@@ -169,8 +167,10 @@ class ReplaySession:
                 "[replay] Step gap %d exceeds max_step_gap=%d — skipping pair %d→%d.",
                 gap, self.max_step_gap, before.step_index, after.step_index,
             )
-            self.n_steps_attempted -= 1  # don't count skipped pairs in attempts
+            # Skipped pairs are not counted as attempted steps
             return None
+
+        self.n_steps_attempted += 1
 
         # ---- B1: configurable truncation with warning ----
         code_for_prompt = before.code

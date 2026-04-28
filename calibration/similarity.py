@@ -154,7 +154,7 @@ def _zss_tree_edit(pred: str, true: str) -> float | None:
         try:
             tree = ast.parse(code)
         except SyntaxError:
-            return None
+            return None, 0
 
         def _convert(node) -> zss.Node:
             z = zss.Node(type(node).__name__)
@@ -162,10 +162,11 @@ def _zss_tree_edit(pred: str, true: str) -> float | None:
                 z.addkid(_convert(child))
             return z
 
-        return _convert(tree)
+        size = sum(1 for _ in ast.walk(tree))
+        return _convert(tree), size
 
-    pred_tree = _build_zss_tree(pred)
-    true_tree = _build_zss_tree(true)
+    pred_tree, pred_size = _build_zss_tree(pred)
+    true_tree, true_size = _build_zss_tree(true)
     if pred_tree is None and true_tree is None:
         return 1.0
     if pred_tree is None or true_tree is None:
@@ -173,9 +174,6 @@ def _zss_tree_edit(pred: str, true: str) -> float | None:
 
     try:
         dist = zss.simple_distance(pred_tree, true_tree)
-        # Normalise by the sum of sizes so the result is in [0, 1]
-        pred_size = sum(1 for _ in ast.walk(ast.parse(pred)))
-        true_size = sum(1 for _ in ast.walk(ast.parse(true)))
         max_dist = pred_size + true_size  # upper bound: delete all + insert all
         if max_dist == 0:
             return 1.0

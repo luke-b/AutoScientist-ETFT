@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -162,19 +163,16 @@ def sweep_thresholds(
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else float("nan")
         recall = tp / (tp + fn) if (tp + fn) > 0 else float("nan")
-        if (
-            not (precision != precision) and not (recall != recall)  # not NaN
-            and (precision + recall) > 0
-        ):
+        if not math.isnan(precision) and not math.isnan(recall) and (precision + recall) > 0:
             f1 = 2 * precision * recall / (precision + recall)
         else:
             f1 = float("nan")
 
         sweep.append({
             "threshold": thr,
-            "precision": round(precision, 4) if precision == precision else None,
-            "recall": round(recall, 4) if recall == recall else None,
-            "f1": round(f1, 4) if f1 == f1 else None,
+            "precision": round(precision, 4) if not math.isnan(precision) else None,
+            "recall": round(recall, 4) if not math.isnan(recall) else None,
+            "f1": round(f1, 4) if not math.isnan(f1) else None,
             "tp": tp,
             "fp": fp,
             "fn": fn,

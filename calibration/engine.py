@@ -158,7 +158,11 @@ class CalibrationEngine:
         )
 
         # Determine gate_status
-        if session.n_agent_failures >= max(1, session.n_steps_attempted) * self._gate.max_agent_failure_rate:
+        if (
+            session.n_steps_attempted > 0
+            and session.n_agent_failures / session.n_steps_attempted
+            >= self._gate.max_agent_failure_rate
+        ):
             gate_status = "agent_failure"
         else:
             gate_status = "evaluated"
