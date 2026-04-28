@@ -122,7 +122,7 @@ def md_to_html(md_text: str, title: str, subtitle: str = "", confidential: bool 
 # ---------------------------------------------------------------------------
 def build_pdf(md_path: Path, out_path: Path, title: str, subtitle: str = "",
               confidential: bool = False) -> None:
-    from weasyprint import HTML, CSS  # type: ignore
+    from weasyprint import HTML  # type: ignore
 
     print(f"  → Building PDF: {out_path.name} …")
     md_text = md_path.read_text(encoding="utf-8")
@@ -148,19 +148,17 @@ def _hex_rgb(hexstr: str):
 def _add_text_box(slide, left_pct, top_pct, width_pct, height_pct,
                   text, font_size_pt, bold=False, color_hex=TEXT_MAIN,
                   italic=False, wrap=True, alignment=None):
-    from pptx.util import Inches, Pt, Emu
-    from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Inches, Pt
 
-    SLIDE_W = 10.0   # inches (widescreen)
-    SLIDE_H = 5.625  # inches
+    SLIDE_W = 10.0   # inches (widescreen)  # noqa: N806
+    SLIDE_H = 5.625  # inches  # noqa: N806
 
     left   = Inches(SLIDE_W * left_pct)
     top    = Inches(SLIDE_H * top_pct)
     width  = Inches(SLIDE_W * width_pct)
     height = Inches(SLIDE_H * height_pct)
 
-    txBox = slide.shapes.add_textbox(left, top, width, height)
+    txBox = slide.shapes.add_textbox(left, top, width, height)  # noqa: N806
     tf = txBox.text_frame
     tf.word_wrap = wrap
 
@@ -180,11 +178,9 @@ def _add_text_box(slide, left_pct, top_pct, width_pct, height_pct,
 
 def _add_rect(slide, left_pct, top_pct, width_pct, height_pct, fill_hex, alpha=None):
     from pptx.util import Inches
-    from pptx.dml.color import RGBColor
-    from pptx.util import Pt
 
-    SLIDE_W = 10.0
-    SLIDE_H = 5.625
+    SLIDE_W = 10.0  # noqa: N806
+    SLIDE_H = 5.625  # noqa: N806
 
     shape = slide.shapes.add_shape(
         1,  # MSO_SHAPE_TYPE.RECTANGLE
@@ -201,10 +197,9 @@ def _add_rect(slide, left_pct, top_pct, width_pct, height_pct, fill_hex, alpha=N
 
 def _add_line(slide, x1_pct, y1_pct, x2_pct, y2_pct, color_hex, width_pt=1.5):
     from pptx.util import Inches, Pt
-    from pptx.dml.color import RGBColor
 
-    SLIDE_W = 10.0
-    SLIDE_H = 5.625
+    SLIDE_W = 10.0  # noqa: N806
+    SLIDE_H = 5.625  # noqa: N806
 
     connector = slide.shapes.add_connector(
         1,  # MSO_CONNECTOR_TYPE.STRAIGHT
@@ -219,13 +214,11 @@ def _add_line(slide, x1_pct, y1_pct, x2_pct, y2_pct, color_hex, width_pt=1.5):
 def _render_slide_content(slide, body_lines: list[str]):
     """Render body lines as bullet points / paragraphs."""
     from pptx.util import Inches, Pt
-    from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
 
-    SLIDE_W = 10.0
-    SLIDE_H = 5.625
+    SLIDE_W = 10.0  # noqa: N806
+    SLIDE_H = 5.625  # noqa: N806
 
-    txBox = slide.shapes.add_textbox(
+    txBox = slide.shapes.add_textbox(  # noqa: N806
         Inches(SLIDE_W * 0.03),
         Inches(SLIDE_H * 0.28),
         Inches(SLIDE_W * 0.94),
@@ -382,10 +375,7 @@ def _add_slide_dark_header_pptx(slide, label, headline, slide_num, total):
 
 def build_pptx(md_path: Path, out_path: Path) -> None:
     from pptx import Presentation
-    from pptx.util import Inches, Pt, Emu
-    from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
-    import pptx.oxml.ns as nsmap
+    from pptx.util import Inches
 
     print(f"  → Building PPTX: {out_path.name} …")
 
