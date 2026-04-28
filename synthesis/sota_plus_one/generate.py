@@ -205,7 +205,13 @@ def generate_recursive(
         logger.info("=== Recursive SOTA+%d Discovery (trajectory=%s) ===", gen, gen_trajectory_id)
 
         # --- Calibration stage-gate ---
-        needs_calibration = len(trajectory_steps) >= min_steps + 1 or not skip_short
+        # Skip calibration when the trajectory is still too short AND the config
+        # allows it (skip_on_short_trajectory=true).  When skip_short=False,
+        # calibration runs unconditionally — every generation must earn the gate.
+        needs_calibration = (
+            len(trajectory_steps) >= min_steps + 1  # enough steps to replay
+            or not skip_short                        # config says never skip
+        )
         if needs_calibration:
             logger.info("[recursive] Calibrating before SOTA+%d synthesis …", gen)
             cal_record = cal_engine.run(
@@ -261,14 +267,17 @@ def generate_recursive(
             best.get("candidate_id"), best.get("risk_score", 0.0), gen,
         )
 
-        # Extend the fossil record with the new SOTA step
+        # Extend the fossil record with the new SOTA step.
+        # fitness_score is a monotonically increasing placeholder — replace
+        # with the physically measured ℱ(aₙ₊ₖ) once GPU evaluation is complete.
         trajectory_steps.append(
             TrajectoryStep(
                 step_index=gen,
                 algorithm_id=f"{trajectory_id}_g{gen}",
                 algorithm_family=trajectory_id,
                 code=current_sota,
-                fitness_score=1.0 + gen * 0.1,  # placeholder; replace with measured fitness
+                fitness_score=1.0 + gen * 0.1,
+                metadata={"source": "recursive_synthesis", "generation": gen},
             )
         )
 
