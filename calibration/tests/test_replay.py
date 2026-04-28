@@ -16,7 +16,6 @@ from calibration.replay import ReplaySession
 from calibration.similarity import code_similarity
 from corpus.regression_pipeline.schemas import TrajectoryStep
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------

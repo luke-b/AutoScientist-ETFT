@@ -105,6 +105,7 @@ def _load_trajectory_steps(
     stage will then auto-pass the gate via ``skip_on_short_trajectory``).
     """
     import json as _json
+
     from corpus.regression_pipeline.schemas import TrajectoryStep
 
     d_gen_dir = data_root / "d_gen"

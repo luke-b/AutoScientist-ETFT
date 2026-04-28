@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from corpus.regression_pipeline.schemas import ReconstructionResult
 
@@ -38,7 +37,7 @@ class StageGateResult:
     """Outcome of a single stage-gate evaluation."""
 
     ready: bool
-    confidence_level: Optional[float]
+    confidence_level: float | None
     threshold: float
     n_steps: int
     diagnostic: str
@@ -125,9 +124,9 @@ class StageGate:
     # ------------------------------------------------------------------
     def evaluate(
         self,
-        confidence_level: Optional[float] = None,
+        confidence_level: float | None = None,
         n_steps: int = 0,
-        reconstruction_results: Optional[list[ReconstructionResult]] = None,
+        reconstruction_results: list[ReconstructionResult] | None = None,
         n_steps_attempted: int = 0,
         n_agent_failures: int = 0,
     ) -> StageGateResult:
