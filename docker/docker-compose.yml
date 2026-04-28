@@ -5,6 +5,9 @@
 # Usage:
 #   cp .env.example .env   # fill in your provider key
 #   docker compose up -d
+#
+# With optional observability services (MLflow + ChromaDB):
+#   docker compose --profile observability up -d
 # =============================================================================
 
 services:
@@ -38,3 +41,65 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Optional: MLflow tracking server
+  # Enable with: docker compose --profile observability up -d
+  # UI available at http://localhost:5000
+  # ---------------------------------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: etft-mlflow
+    profiles:
+      - observability
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Optional: ChromaDB persistent vector store
+  # Enable with: docker compose --profile observability up -d
+  # API available at http://localhost:8000
+  # ---------------------------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: etft-chromadb
+    profiles:
+      - observability
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - vector_store_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  mlflow_data:
+    driver: local
+  vector_store_data:
+    driver: local

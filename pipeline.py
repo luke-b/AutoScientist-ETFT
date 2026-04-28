@@ -22,7 +22,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -31,14 +30,12 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from etft.config import load_config
-
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-_ALL_STAGES = ("corpus", "train", "arl", "generate")
+_ALL_STAGES = ("corpus", "analyse", "train", "arl", "generate")
 
 # ---------------------------------------------------------------------------
 # Pipeline state helpers
@@ -117,13 +114,53 @@ def _run_corpus_stage(
     return str(d_gen_dir)
 
 
+def _run_analyse_stage(
+    cfg: dict,
+    data_root: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Run Pareto delta analysis on the accumulated 𝒟_Gen corpus.
+
+    Persists the report to ``data_root/analysis_report.json`` and records the
+    top bottleneck component in ``pipeline_state.json`` so the ARL stage can
+    use it as ``--bottleneck`` without manual intervention.
+
+    Returns the report dict.
+    """
+    from analysis.pareto_delta.run import run_analyse
+
+    logger.info("[analyse] Running Pareto delta analysis …")
+
+    report_path = data_root / "analysis_report.json"
+    report = run_analyse(
+        data_root=data_root,
+        pareto_threshold=cfg.get("analysis", {}).get("pareto_delta", {}).get("pareto_threshold", 0.80),
+        min_delta_lines=cfg.get("analysis", {}).get("pareto_delta", {}).get("min_delta_lines", 5),
+        as_json=False,
+        save_to=report_path,
+    )
+
+    # Extract top bottleneck for downstream ARL stage
+    pareto_set = report.get("pareto_set", [])
+    top_bottleneck = pareto_set[0]["component"] if pareto_set else None
+    state["top_bottleneck"] = top_bottleneck
+    _log_event(state, "analyse", {
+        "report_path": str(report_path),
+        "top_bottleneck": top_bottleneck,
+        "total_fitness_gain": report.get("total_fitness_gain", 0),
+    })
+    logger.info("[analyse] Done. Top bottleneck: %s", top_bottleneck or "(none identified)")
+    return report
+
+
 def _run_train_stage(
     cfg: dict,
     data_root: Path,
     state: dict[str, Any],
 ) -> str:
     """Fine-tune the model on the accumulated corpus and return checkpoint dir."""
-    from train import build_dataset, train as _train
+    from train import train as _train
 
     logger.info("[train] Fine-tuning model on corpus …")
     train_cfg = cfg.get("training", {})
@@ -286,6 +323,9 @@ def run_pipeline(
                 cfg, target, seed_code, seed_fitness, regression_depth, data_root, state
             )
 
+        elif current_stage == "analyse":
+            result["analyse"] = _run_analyse_stage(cfg, data_root, state)
+
         elif current_stage == "train":
             result["train"] = _run_train_stage(cfg, data_root, state)
 
@@ -371,11 +411,36 @@ def parse_args() -> argparse.Namespace:
         default="config.yaml",
         help="Path to config.yaml (default: config.yaml).",
     )
+    parser.add_argument(
+        "--validate-config",
+        action="store_true",
+        default=False,
+        help="Validate config.yaml against the schema and exit (0 = valid, 1 = invalid).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.validate_config:
+        import sys
+
+        from pydantic import ValidationError
+
+        from etft.config import load_config
+
+        try:
+            load_config(args.config, validate=True)
+            print(f"Config '{args.config}' is valid.")
+            sys.exit(0)
+        except ValidationError as exc:
+            print(f"Config validation failed for '{args.config}':\n{exc}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as exc:
+            print(f"Failed to load config '{args.config}': {exc}", file=sys.stderr)
+            sys.exit(1)
+
     cfg = load_config(args.config)
 
     seed_code = ""

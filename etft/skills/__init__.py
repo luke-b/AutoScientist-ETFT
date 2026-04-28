@@ -7,6 +7,7 @@ from etft.skills.base import (
     SkillRegistry,
     ToolCall,
 )
+from etft.skills.synthesis_skill import EvolutionaryResearchSynthesisSkill
 
 __all__ = [
     "Skill",
@@ -14,4 +15,5 @@ __all__ = [
     "ToolCall",
     "LLMResponse",
     "AgentResult",
+    "EvolutionaryResearchSynthesisSkill",
 ]

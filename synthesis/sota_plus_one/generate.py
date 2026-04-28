@@ -130,9 +130,9 @@ def _route_triage_failure(candidate: SOTAPlusOneCandidate, cfg: dict) -> None:
 
 def _submit_candidate(candidate: SOTAPlusOneCandidate, cfg: dict, output_dir: Path) -> None:
     """Submit a triage-passing candidate via the cluster adapter."""
-    from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
+    from synthesis.sota_plus_one.cluster_adapter import get_adapter
 
-    adapter = LocalSubprocessAdapter(cfg)
+    adapter = get_adapter(cfg)
     try:
         job_id = adapter.submit(candidate)
         logger.info("Candidate %s submitted — job_id=%s", candidate.candidate_id, job_id)

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -229,6 +230,10 @@ class RunLogger:
     def _mlflow_start(self) -> None:
         try:
             import mlflow  # noqa: PLC0415
+
+            tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
+            if tracking_uri:
+                mlflow.set_tracking_uri(tracking_uri)
 
             if mlflow.active_run() is None:
                 mlflow.start_run(run_name=f"arl/{self.run_id}")
