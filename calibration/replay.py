@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from corpus.regression_pipeline.schemas import ReconstructionResult, TrajectoryStep
 from etft.agent import AgentClient
@@ -126,7 +125,7 @@ class ReplaySession:
     similarity_fn: object = None  # Callable[[str, str], float]
     max_code_chars: int = 8000
     blind_mode: bool = False
-    max_step_gap: Optional[int] = None
+    max_step_gap: int | None = None
     results: list[ReconstructionResult] = field(default_factory=list, init=False)
     n_agent_failures: int = field(default=0, init=False)
     n_steps_attempted: int = field(default=0, init=False)
@@ -141,7 +140,7 @@ class ReplaySession:
         self,
         before: TrajectoryStep,
         after: TrajectoryStep,
-    ) -> Optional[ReconstructionResult]:
+    ) -> ReconstructionResult | None:
         """
         Ask the model to reconstruct *after* given *before* and the delta.
 

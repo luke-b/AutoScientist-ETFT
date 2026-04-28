@@ -25,8 +25,7 @@ from __future__ import annotations
 import ast
 import difflib
 import re
-from typing import Callable
-
+from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Tokeniser helpers

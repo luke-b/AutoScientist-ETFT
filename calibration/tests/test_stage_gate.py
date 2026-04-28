@@ -3,6 +3,7 @@ calibration/tests/test_stage_gate.py — Unit tests for StageGate.
 """
 
 import pytest
+
 from calibration.stage_gate import StageGate
 from corpus.regression_pipeline.schemas import ReconstructionResult
 

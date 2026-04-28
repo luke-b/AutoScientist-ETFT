@@ -3,6 +3,7 @@ calibration/tests/test_similarity.py — Unit tests for similarity metrics.
 """
 
 import pytest
+
 from calibration.similarity import (
     ast_edit,
     ast_node_sequence,

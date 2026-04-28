@@ -18,7 +18,6 @@ import pytest
 from calibration.engine import CalibrationEngine
 from corpus.regression_pipeline.schemas import TrajectoryStep
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------

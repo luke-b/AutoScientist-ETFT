@@ -8,7 +8,7 @@ agents, and synthesis modules.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -207,7 +207,7 @@ class ReconstructionResult(BaseModel):
     step_index_after: int
     predicted_code: str = Field(..., description="Code reconstructed by the model.")
     true_code: str = Field(..., description="Ground-truth successor code from the trajectory.")
-    similarity_score: Optional[float] = Field(
+    similarity_score: float | None = Field(
         None,
         description=(
             "Sim(a_pred_i, a_true_i) ∈ [0, 1]; higher is better. "
@@ -241,7 +241,7 @@ class CalibrationRecord(BaseModel):
         0,
         description="Number of step pairs where the agent call returned success=False.",
     )
-    confidence_level: Optional[float] = Field(
+    confidence_level: float | None = Field(
         None,
         description=(
             "C = (1/n) Σ Sim(a_pred_i, a_true_i) [Eq. 1, Benda 2026]. "
