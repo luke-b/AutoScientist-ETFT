@@ -36,6 +36,8 @@ This repository implements the full **Open-Loop Empirical Architecture** describ
 | **📊 Retrospective 80/20 Δ Analysis** | Deterministically identifies the sub-components historically responsible for 80% of performance gains |
 | **🧪 *In-Silico* Triage Filter** | Probabilistic heuristic filter that catches high-risk hypotheses (e.g., OOM errors) *before* expensive GPU evaluation |
 | **♻️ Organic Negative Data Loop** | Failed experiments and triage rejections automatically harden the filter—no manual labelling required |
+| **🎯 Calibration Engine & Stage-Gate** | Evolutionary Replay protocol validates the model's readiness by reconstructing historical trajectory steps before SOTA+x synthesis is unlocked |
+| **🔄 Recursive SOTA+x Discovery** | Each verified SOTA+k candidate is integrated back into the trajectory, allowing the system to recursively hypothesise SOTA+2, SOTA+3, and beyond |
 | **🌐 General Innovation Accelerator** | Domain-agnostic: the same machinery applies to drug discovery, materials science, supply-chain optimisation, and beyond |
 
 ---
@@ -193,6 +195,113 @@ flowchart TD
 
 ---
 
+## 🎯 The Calibration Engine: Evolutionary Replay & Stage-Gate
+
+Introduced in *"Recursive Stage-Gate Calibration for SOTA+x Discovery"* (Benda, 2026), the **Calibration Engine** enforces a hard algorithmic stage-gate that prevents the synthesiser from proposing speculative next-generation algorithms until it has demonstrably internalised the evolutionary history.
+
+### The Morphological Constraint
+
+A central challenge in building evolutionary trajectories is calibrating the *granularity* of each evolutionary leap. ETFT solves this through a biological analogy:
+
+- **Macro-Evolutionary Jumps** — Each transition represents a fundamental shift in complexity or representation (e.g., dense matrices → sparse ALBERT-style architectures), not merely a syntactic edit.
+- **Operational Integrity** — Every step in the trajectory must be a fully functional, compilable program. Broken code corrupts the training signal.
+- **Causal Meta-Data (𝑴)** — Each `aᵢ₋₁ → aᵢ` transition is paired with quantitative impact data (e.g., "Freed 2.1 MB of code payload") and causal explanations, grounding each innovation in verifiable computer science.
+
+### Formal Calibration Protocol
+
+Before generating a SOTA+1 hypothesis, the model must **re-run the history** of the algorithm:
+
+```
+Input:        aᵢ₋₁  +  target performance metrics Mᵢ  (ΔLoss, ΔMemory)
+Reconstruction: model synthesises aᵢ satisfying those metrics
+Confidence:   C = (1/n) Σ Sim(aᵢᵖʳᵉᵈ, aᵢᵗʳᵘᵉ)              [Eq. 1]
+Stage-Gate:   OPEN only when C ≥ threshold  →  model is "Ready for Action"
+```
+
+The similarity function `Sim()` is a configurable composite of:
+- **Token Jaccard** — bag-of-tokens overlap (fast, reformatting-robust)
+- **Line LCS** — longest-common-subsequence over source lines (order-sensitive)
+- **AST Edit** — structural similarity on Python AST node sequences (syntax-invariant)
+
+```mermaid
+flowchart TD
+    A["📚 Evolutionary Trajectory\n(a₀ → aₙ)"]:::blue --> B["🔁 Evolutionary Replay\n(ReplaySession)"]:::orange
+    B --> C["📐 Confidence Level\nC = (1/n) Σ Sim(pred, true)"]:::teal
+
+    C -->|"C ≥ threshold"| D["✅ Stage-Gate OPEN\nModel: Ready for Action"]:::green
+    C -->|"C < threshold"| E["🔒 Stage-Gate CLOSED\nSynthesis BLOCKED"]:::red
+
+    D --> F["🧬 SOTA+1 Synthesis\n(Unlocked)"]:::green2
+
+    classDef blue fill:#dbeafe,stroke:#2563eb,color:#1a1a1a
+    classDef orange fill:#fef3c7,stroke:#d97706,color:#1a1a1a
+    classDef teal fill:#ccfbf1,stroke:#0d9488,color:#1a1a1a
+    classDef green fill:#dcfce7,stroke:#16a34a,color:#1a1a1a
+    classDef green2 fill:#bbf7d0,stroke:#15803d,color:#1a1a1a
+    classDef red fill:#fee2e2,stroke:#dc2626,color:#1a1a1a
+```
+
+> **Figure 3 — The Calibration Engine.**
+> The Evolutionary Replay protocol establishes a hard stage-gate grounded in
+> verifiable computer science principles. SOTA+x synthesis is only unlocked
+> when the model demonstrates functional parity with the historical trajectory.
+
+### Readiness & Calibration Framework
+
+| Component | Function | Verification Metric |
+|---|---|---|
+| **Trajectory (𝒯)** | Ordered n-tuple of functional code | `ℱ(aᵢ₋₁) < ℱ(aᵢ)` |
+| **Meta-Dataset (𝑴)** | Causal grounding of each innovation | Quantitative resource deltas (ΔLoss, ΔMemory) |
+| **Calibration** | Evolutionary Replay validation | Reconstruction Confidence C |
+| **Stage-Gate** | Unlock speculative SOTA+x synthesis | Functional parity with historical SOTA |
+
+---
+
+## 🔄 Recursive SOTA+x Discovery
+
+The true power of ETFT lies in its **recursive potential** (§3, Benda 2026). Once a SOTA+1 candidate is verified, it is not discarded — it becomes the new foundation for the next generation of innovation:
+
+```mermaid
+flowchart LR
+    A["🏆 aₙ (SOTA)"]:::sota --> CAL1["🎯 Calibrate\n(Stage-Gate 1)"]:::gate
+    CAL1 -->|"✅ C ≥ θ"| SYN1["🧬 Synthesise SOTA+1"]:::synth
+    SYN1 --> VER1["✔️ Verify aₙ₊₁"]:::verify
+    VER1 -->|"Promote to new SOTA"| CAL2["🎯 Recalibrate\n(Stage-Gate 2)"]:::gate
+    CAL2 -->|"✅ C ≥ θ"| SYN2["🧬 Synthesise SOTA+2"]:::synth
+    SYN2 --> VER2["✔️ Verify aₙ₊₂"]:::verify
+    VER2 -.->|"Extends fossil record"| CAL2
+
+    classDef sota fill:#fee2e2,stroke:#dc2626,color:#1a1a1a
+    classDef gate fill:#fef3c7,stroke:#d97706,color:#1a1a1a
+    classDef synth fill:#dcfce7,stroke:#16a34a,color:#1a1a1a
+    classDef verify fill:#dbeafe,stroke:#2563eb,color:#1a1a1a
+```
+
+> **Figure 4 — Recursive SOTA+x Discovery.**
+> Each verified SOTA+k candidate extends the "fossil record" (a₀ → aₙ₊ₖ).
+> The system recalibrates on the newly extended trajectory before hypothesising
+> the next generation, enabling truly multi-generational autonomous innovation.
+
+**Key properties of recursive discovery:**
+
+1. **Fossil Record Extension** — Each verified SOTA+k is appended to the trajectory, giving the system an ever-richer evolutionary history to learn from.
+2. **Per-Generation Recalibration** — The Confidence Level C is recomputed from the *extended* trajectory before each new synthesis step, ensuring the model's understanding keeps pace with its own discoveries.
+3. **Adaptive Halt** — If the stage-gate closes (C drops below threshold) or no triage-passing candidates are produced, the loop halts gracefully rather than generating unconstrained speculation.
+
+### Quick-Start: Recursive Mode
+
+```bash
+# Generate SOTA+1, SOTA+2, and SOTA+3 in sequence with calibration between each
+python synthesis/sota_plus_one/generate.py \
+    --trajectory image_classification_cnn \
+    --sota-code sota.py \
+    --bottleneck attention_mechanism \
+    --recursive \
+    --generations 3
+```
+
+---
+
 ## 🌍 The General Innovation Accelerator
 
 The implications of ETFT extend **far beyond deep learning**. An algorithm is, at its core, *any set of rules that transforms inputs into outputs*. The same evolutionary trajectory methodology applies across:
@@ -217,13 +326,18 @@ AutoScientist-ETFT/
 ├── 📂 corpus/
 │   ├── regression_pipeline/    # AI-Assisted Top-Down Regression (𝒟_Gen, 𝒟_Rationale)
 │   └── performance_estimator/  # Probabilistic Heuristic Filter (𝒟_Perf)
+├── 📂 calibration/
+│   ├── engine.py               # CalibrationEngine — Evolutionary Replay orchestrator
+│   ├── replay.py               # ReplaySession — model-driven step reconstruction
+│   ├── stage_gate.py           # StageGate — blocks synthesis until C ≥ threshold
+│   └── similarity.py           # Sim() functions: token Jaccard, LCS, AST, composite
 ├── 📂 agents/
 │   ├── literature/             # Agentic RAG — Deep Literature Synthesis
 │   └── empirical/              # Coding agents — Micro-Experiments
 ├── 📂 analysis/
 │   └── pareto_delta/           # Retrospective 80/20 Δ Analysis
 ├── 📂 synthesis/
-│   └── sota_plus_one/          # Augmented SOTA+1 Generation & Triage
+│   └── sota_plus_one/          # Augmented SOTA+x Generation, Triage & Recursive Loop
 └── 📂 feedback/
     └── rl_loop/                # In-Context RL & Organic Negative Data
 ```
@@ -255,11 +369,22 @@ python corpus/regression_pipeline/run.py --target <algorithm_family>
 # Step 2: Fine-tune your LLM on the generated trajectories
 python train.py --dataset corpus/ --model <your-base-model>
 
-# Step 3: Launch the Agentic Research Loop
+# Step 3: Run the Calibration Engine (Evolutionary Replay stage-gate)
+python pipeline.py --target <algorithm_family> --seed-code sota.py --stage calibrate
+
+# Step 4: Launch the Agentic Research Loop
 python agents/run_arl.py --bottleneck <identified_component>
 
-# Step 4: Generate and evaluate a SOTA+1 candidate
+# Step 5: Generate and evaluate a SOTA+1 candidate
 python synthesis/sota_plus_one/generate.py --trajectory <trajectory_id>
+
+# Step 6 (optional): Recursive SOTA+x discovery (SOTA+1 → SOTA+2 → SOTA+3)
+python synthesis/sota_plus_one/generate.py \
+    --trajectory <trajectory_id> \
+    --recursive --generations 3
+
+# Run the full pipeline (all stages including calibration)
+python pipeline.py --target <algorithm_family> --seed-code sota.py
 ```
 
 ---
@@ -271,6 +396,7 @@ All papers are located in the [`papers/`](papers/) directory.
 | Paper | Description |
 |---|---|
 | [**Evolutionary Trajectory Fine-Tuning**](papers/ETFT.pdf) | The foundational paper introducing ETFT. Proposes training LLMs on ordered sequences of improving algorithms to teach the *direction* of progress. Introduces the Open-Loop Empirical Architecture, 80/20 Δ Analysis, and the Probabilistic Heuristic Filter. *(Benda, April 2026)* |
+| [**Recursive Stage-Gate Calibration**](papers/Recursive%20Stage-Gate%20Calibratio.pdf) | Introduces the **Calibration Engine** and the Evolutionary Replay protocol. Establishes a hard algorithmic stage-gate (Confidence Level C) that grounds SOTA+x synthesis in verifiable computer science principles. Also introduces Recursive SOTA+x Discovery — multi-generational autonomous innovation by extending the fossil record. *(Benda, April 2026)* |
 | [**The Meta-Evolutionary Epoch**](papers/The%20Meta-Evolutionary%20Epoch.pdf) | A visionary capstone extending ETFT beyond individual algorithms to higher-order Scientific Blueprints and societal paradigms. Argues that the same evolutionary trajectory methodology can accelerate epochal shifts across entire technological and organisational domains. *(Benda, April 2026)* |
 | [**GPU-Poor ETFT Proof of Concept**](papers/PoC-ETFT-GPU-Poor.pdf) | A concrete PoC validating ETFT on a TinyML time-series anomaly-detection benchmark for microcontrollers. Demonstrates autonomous SOTA+1 discovery using only cloud reasoning APIs and a consumer GPU, decoupling hypothesis synthesis from physical evaluation. *(Benda, April 2026)* |
 | [**Peer Review Report**](papers/Concept_LLM.pdf) | Official peer review of the ETFT paper — verdict: *Strong Accept (Recommended for Oral Presentation/Spotlight)*. Provides a detailed critical analysis of the dataset generation architecture, the agentic research loop, and the broader implications of the General Innovation Accelerator vision. *(April 2026)* |

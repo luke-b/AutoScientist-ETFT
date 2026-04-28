@@ -249,6 +249,50 @@ class TrainingConfig(_AllowExtra):
 
 
 # ---------------------------------------------------------------------------
+# Calibration (Recursive Stage-Gate)
+# ---------------------------------------------------------------------------
+
+
+class CalibrationConfig(_AllowExtra):
+    """
+    Configuration for the Evolutionary Replay Calibration Engine.
+
+    The calibration stage runs before SOTA+x synthesis.  The model must
+    reconstruct each step of the trajectory from its predecessor; only when
+    the mean reconstruction similarity C meets ``confidence_threshold`` is
+    the stage-gate opened and synthesis permitted.
+    """
+
+    confidence_threshold: float = Field(
+        0.65,
+        ge=0.0,
+        le=1.0,
+        description="Minimum C = (1/n) Σ Sim(pred, true) to open the stage-gate.",
+    )
+    min_replay_steps: int = Field(
+        2,
+        ge=1,
+        description="Minimum number of trajectory pairs that must be replayed.",
+    )
+    similarity_metric: str = Field(
+        "composite",
+        description="'composite' | 'token_jaccard' | 'line_lcs' | 'ast_edit'",
+    )
+    skip_on_short_trajectory: bool = Field(
+        True,
+        description=(
+            "When True, skip calibration (and open the gate automatically) for "
+            "trajectories with fewer than min_replay_steps + 1 steps.  "
+            "Set to False to enforce strict calibration regardless of trajectory length."
+        ),
+    )
+    output_dir: str = Field(
+        "./data/calibration",
+        description="Directory where CalibrationRecord JSON files are persisted.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
 
@@ -261,6 +305,7 @@ class ETFTConfig(_AllowExtra):
     agent_proxy: AgentProxyConfig = Field(default_factory=AgentProxyConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     corpus: CorpusConfig = Field(default_factory=CorpusConfig)
+    calibration: CalibrationConfig = Field(default_factory=CalibrationConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)

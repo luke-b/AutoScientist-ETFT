@@ -180,6 +180,69 @@ class SOTAPlusOneCandidate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Calibration Engine (Recursive Stage-Gate)
+# ---------------------------------------------------------------------------
+
+
+class ReconstructionResult(BaseModel):
+    """
+    Outcome of a single step in the Evolutionary Replay protocol.
+
+    The Calibration Engine asks the model to reconstruct algorithm a_i from
+    a_{i-1} and the causal meta-data M_i.  This record captures the predicted
+    code and its similarity to the ground-truth successor so the Confidence
+    Level C can be computed.  (§2, Benda 2026)
+    """
+
+    trajectory_id: str
+    step_index_before: int
+    step_index_after: int
+    predicted_code: str = Field(..., description="Code reconstructed by the model.")
+    true_code: str = Field(..., description="Ground-truth successor code from the trajectory.")
+    similarity_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Sim(a_pred_i, a_true_i) ∈ [0, 1]; higher is better.",
+    )
+    agent_success: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CalibrationRecord(BaseModel):
+    """
+    Full record of one Evolutionary Replay calibration run for a trajectory.
+
+    Persisted by ``CalibrationEngine`` to ``data/calibration/`` so the
+    history of calibration attempts is auditable.
+
+    The ``gate_passed`` flag indicates whether the Confidence Level C met
+    the configured threshold — this is the hard stage-gate that must be
+    satisfied before SOTA+x synthesis is permitted.  (§2, Benda 2026)
+    """
+
+    trajectory_id: str
+    timestamp: str = Field(..., description="UTC ISO-8601 timestamp of the calibration run.")
+    n_steps_replayed: int
+    confidence_level: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="C = (1/n) Σ Sim(a_pred_i, a_true_i) [Eq. 1, Benda 2026].",
+    )
+    threshold: float = Field(..., description="Minimum C required for gate_passed=True.")
+    gate_passed: bool = Field(
+        ..., description="True when C ≥ threshold — SOTA+x synthesis is unlocked."
+    )
+    gate_diagnostic: str = Field(
+        "", description="Human-readable explanation of the gate decision."
+    )
+    similarity_metric: str = Field("composite", description="Similarity function used.")
+    reconstruction_results: list[ReconstructionResult] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
 # Feedback / RL
 # ---------------------------------------------------------------------------
 

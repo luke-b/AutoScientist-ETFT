@@ -1,10 +1,17 @@
 """
-synthesis/sota_plus_one/generate.py — CLI entrypoint for SOTA+1 generation.
+synthesis/sota_plus_one/generate.py — CLI entrypoint for SOTA+x generation.
+
+Implements standard SOTA+1 synthesis and recursive SOTA+x discovery as
+introduced by the Recursive Stage-Gate Calibration paper (Benda, 2026).
+
+In recursive mode (``--recursive`` / ``generations > 1``), each verified
+SOTA+k candidate is integrated back into the trajectory and the calibration
+stage-gate is re-evaluated before hypothesising SOTA+(k+1).
 
 Usage:
     python -m synthesis.sota_plus_one.generate --trajectory <id> \\
         [--bottleneck <component>] [--arl-result ./data/arl_results/arl_X.json] \\
-        [--submit]
+        [--submit] [--recursive --generations 3]
 """
 
 from __future__ import annotations
@@ -119,6 +126,164 @@ def generate(
     return results
 
 
+def generate_recursive(
+    cfg: dict,
+    trajectory_id: str,
+    sota_code: str,
+    bottleneck: str,
+    brief: ResearchBrief,
+    empirical_summary: dict | None,
+    output_dir: Path,
+    rl_context: str = "",
+    submit: bool = False,
+    generations: int = 3,
+) -> dict[str, list[dict]]:
+    """
+    Recursive SOTA+x discovery loop (§3, Benda 2026).
+
+    After each successful SOTA+k generation, the best triage-passing candidate
+    is promoted to the new SOTA and the calibration stage-gate is re-evaluated
+    before hypothesising SOTA+(k+1).  This extends the "fossil record" by one
+    generation per iteration, enabling multi-generational innovation.
+
+    Parameters
+    ----------
+    cfg:
+        Runtime configuration dict.
+    trajectory_id:
+        Base trajectory identifier.  Each generation is suffixed ``_gN``.
+    sota_code:
+        Source code of the *current* SOTA (SOTA+0).
+    bottleneck:
+        Bottleneck component from Pareto analysis (shared across generations).
+    brief:
+        ResearchBrief from the ARL literature phase.
+    empirical_summary:
+        Empirical metrics dict (or None).
+    output_dir:
+        Root directory for candidate files; each generation writes to
+        ``output_dir/gen_N/``.
+    rl_context:
+        In-context RL feedback from prior ARL failures.
+    submit:
+        Forward to physical cluster submission.
+    generations:
+        Number of successive SOTA+x hypotheses to attempt (default 3).
+
+    Returns
+    -------
+    dict[str, list[dict]]
+        Mapping ``"gen_N" -> list_of_candidate_dicts`` for each generation.
+    """
+    from calibration.engine import CalibrationEngine
+    from corpus.regression_pipeline.schemas import TrajectoryStep
+
+    cal_cfg = cfg.get("calibration", {})
+    cal_engine = CalibrationEngine(cfg)
+    cal_output_dir = Path(cal_cfg.get("output_dir", "./data/calibration"))
+    min_steps = int(cal_cfg.get("min_replay_steps", 2))
+    skip_short = bool(cal_cfg.get("skip_on_short_trajectory", True))
+
+    all_results: dict[str, list[dict]] = {}
+    current_sota = sota_code
+    # Seed the trajectory with a single step representing the starting SOTA
+    trajectory_steps: list[TrajectoryStep] = [
+        TrajectoryStep(
+            step_index=0,
+            algorithm_id=f"{trajectory_id}_g0",
+            algorithm_family=trajectory_id,
+            code=sota_code,
+            fitness_score=1.0,
+        )
+    ]
+
+    for gen in range(1, generations + 1):
+        gen_label = f"gen_{gen}"
+        gen_trajectory_id = f"{trajectory_id}_g{gen}"
+        gen_output_dir = output_dir / gen_label
+
+        logger.info("=== Recursive SOTA+%d Discovery (trajectory=%s) ===", gen, gen_trajectory_id)
+
+        # --- Calibration stage-gate ---
+        # Skip calibration when the trajectory is still too short AND the config
+        # allows it (skip_on_short_trajectory=true).  When skip_short=False,
+        # calibration runs unconditionally — every generation must earn the gate.
+        needs_calibration = (
+            len(trajectory_steps) >= min_steps + 1  # enough steps to replay
+            or not skip_short                        # config says never skip
+        )
+        if needs_calibration:
+            logger.info("[recursive] Calibrating before SOTA+%d synthesis …", gen)
+            cal_record = cal_engine.run(
+                trajectory_id=gen_trajectory_id,
+                steps=trajectory_steps,
+                output_dir=cal_output_dir,
+            )
+            if not cal_record.gate_passed:
+                logger.error(
+                    "[recursive] Stage-gate CLOSED at generation %d — C=%.3f < %.3f. "
+                    "Halting recursive loop. %s",
+                    gen, cal_record.confidence_level, cal_record.threshold,
+                    cal_record.gate_diagnostic,
+                )
+                break
+            logger.info("[recursive] Stage-gate OPEN — proceeding to SOTA+%d synthesis.", gen)
+        else:
+            logger.info(
+                "[recursive] Skipping calibration for gen %d "
+                "(trajectory depth=%d < min_replay_steps+1=%d, skip_on_short_trajectory=true).",
+                gen, len(trajectory_steps), min_steps + 1,
+            )
+
+        # --- Generate SOTA+k candidates ---
+        gen_results = generate(
+            cfg=cfg,
+            trajectory_id=gen_trajectory_id,
+            sota_code=current_sota,
+            bottleneck=bottleneck,
+            brief=brief,
+            empirical_summary=empirical_summary,
+            output_dir=gen_output_dir,
+            rl_context=rl_context,
+            submit=submit,
+        )
+        all_results[gen_label] = gen_results
+
+        # --- Promote best triage-passing candidate to new SOTA ---
+        passed = [r for r in gen_results if r.get("triage_passed")]
+        if not passed:
+            logger.warning(
+                "[recursive] No triage-passing candidates in generation %d — "
+                "halting recursive loop.",
+                gen,
+            )
+            break
+
+        # Pick the candidate with the lowest risk score as the new SOTA
+        best = min(passed, key=lambda r: r.get("risk_score", 1.0))
+        current_sota = best["code"]
+        logger.info(
+            "[recursive] Promoting candidate %s (risk=%.3f) as SOTA+%d for next generation.",
+            best.get("candidate_id"), best.get("risk_score", 0.0), gen,
+        )
+
+        # Extend the fossil record with the new SOTA step.
+        # fitness_score is a monotonically increasing placeholder — replace
+        # with the physically measured ℱ(aₙ₊ₖ) once GPU evaluation is complete.
+        trajectory_steps.append(
+            TrajectoryStep(
+                step_index=gen,
+                algorithm_id=f"{trajectory_id}_g{gen}",
+                algorithm_family=trajectory_id,
+                code=current_sota,
+                fitness_score=1.0 + gen * 0.1,
+                metadata={"source": "recursive_synthesis", "generation": gen},
+            )
+        )
+
+    return all_results
+
+
 def _route_triage_failure(candidate: SOTAPlusOneCandidate, cfg: dict) -> None:
     try:
         from feedback.rl_loop.feedback_router import FeedbackRouter
@@ -156,7 +321,7 @@ def _submit_candidate(candidate: SOTAPlusOneCandidate, cfg: dict, output_dir: Pa
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate and triage SOTA+1 candidates.")
+    parser = argparse.ArgumentParser(description="Generate and triage SOTA+x candidates.")
     parser.add_argument("--trajectory", required=True, help="Trajectory ID.")
     parser.add_argument(
         "--sota-code",
@@ -182,6 +347,26 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Submit triage-passing candidates to the cluster adapter for physical evaluation. "
             "Physical evaluation failures are automatically routed to the feedback loop."
+        ),
+    )
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable Recursive SOTA+x Discovery (§3, Benda 2026). "
+            "Each verified SOTA+k candidate is promoted to the new SOTA and the "
+            "calibration stage-gate is re-evaluated before hypothesising SOTA+(k+1). "
+            "Use --generations to control the number of successive hypotheses."
+        ),
+    )
+    parser.add_argument(
+        "--generations",
+        type=int,
+        default=3,
+        help=(
+            "Number of successive SOTA+x generations to attempt in recursive mode "
+            "(default: 3). Ignored when --recursive is not set."
         ),
     )
     return parser.parse_args()
@@ -212,17 +397,31 @@ def main() -> None:
         empirical_summary = arl.get("experiment_metrics")
         rl_context = arl.get("rl_context_prefix", "")
 
-    generate(
-        cfg=cfg,
-        trajectory_id=args.trajectory,
-        sota_code=sota_code,
-        bottleneck=args.bottleneck,
-        brief=brief,
-        empirical_summary=empirical_summary,
-        output_dir=Path(args.output_dir),
-        rl_context=rl_context,
-        submit=args.submit,
-    )
+    if args.recursive:
+        generate_recursive(
+            cfg=cfg,
+            trajectory_id=args.trajectory,
+            sota_code=sota_code,
+            bottleneck=args.bottleneck,
+            brief=brief,
+            empirical_summary=empirical_summary,
+            output_dir=Path(args.output_dir),
+            rl_context=rl_context,
+            submit=args.submit,
+            generations=args.generations,
+        )
+    else:
+        generate(
+            cfg=cfg,
+            trajectory_id=args.trajectory,
+            sota_code=sota_code,
+            bottleneck=args.bottleneck,
+            brief=brief,
+            empirical_summary=empirical_summary,
+            output_dir=Path(args.output_dir),
+            rl_context=rl_context,
+            submit=args.submit,
+        )
 
 
 if __name__ == "__main__":
