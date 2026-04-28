@@ -127,11 +127,18 @@ class ObjectiveCalibration:
             "similarity_metric",
             self._cfg.get("calibration", {}).get("similarity_metric", "composite"),
         )
-        weights_raw = obj_cfg.get(
+        weights_raw = list(obj_cfg.get(
             "similarity_weights",
             self._cfg.get("calibration", {}).get("similarity_weights", [0.4, 0.3, 0.3]),
+        ))
+        # Ensure exactly 3 elements (pad with 0.0 or truncate)
+        while len(weights_raw) < 3:
+            weights_raw.append(0.0)
+        self._similarity_weights: tuple[float, float, float] = (
+            float(weights_raw[0]),
+            float(weights_raw[1]),
+            float(weights_raw[2]),
         )
-        self._similarity_weights: tuple[float, float, float] = tuple(weights_raw[:3])  # type: ignore[assignment]
         self._similarity_fn = self._build_similarity_fn(metric_name)
 
     # ------------------------------------------------------------------

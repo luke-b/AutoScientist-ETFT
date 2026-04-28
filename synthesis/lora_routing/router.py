@@ -237,8 +237,9 @@ class DynamicLoRARouter:
         else:
             index_path = lr_cfg.get(
                 "adapter_index_path",
-                self._cfg.get("training", {}).get("output_dir", "./checkpoints")
-                + "/adapter_index.json",
+            ) or str(
+                Path(self._cfg.get("training", {}).get("output_dir", "./checkpoints"))
+                / "adapter_index.json"
             )
             self._library = AdapterLibrary(index_path=Path(index_path))
 

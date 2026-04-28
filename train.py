@@ -511,17 +511,16 @@ def main() -> None:
     if args.output_dir:
         output_dir = Path(args.output_dir)
     elif args.mode == "width" and args.generation is not None:
-        oc_cfg = cfg.get("orthogonal_calibration", {})
         width_adapter_root = oc_cfg.get("width", {}).get(
             "adapter_output_dir",
-            cfg.get("training", {}).get("output_dir", "./checkpoints") + "/width_adapters",
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "width_adapters"),
         )
         output_dir = Path(width_adapter_root) / f"gen_{args.generation}"
     else:
         oc_cfg = cfg.get("orthogonal_calibration", {})
         depth_adapter_dir = oc_cfg.get("depth", {}).get(
             "adapter_output_dir",
-            cfg.get("training", {}).get("output_dir", "./checkpoints"),
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "depth_adapter"),
         )
         output_dir = Path(depth_adapter_dir)
 

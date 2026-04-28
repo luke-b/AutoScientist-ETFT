@@ -124,8 +124,9 @@ class RecursiveSOTAGenerator:
             lr_cfg = self._cfg.get("lora_routing", {})
             index_path = lr_cfg.get(
                 "adapter_index_path",
-                self._cfg.get("training", {}).get("output_dir", "./checkpoints")
-                + "/adapter_index.json",
+            ) or str(
+                Path(self._cfg.get("training", {}).get("output_dir", "./checkpoints"))
+                / "adapter_index.json"
             )
             self._library = AdapterLibrary(index_path=Path(index_path))
 
@@ -222,9 +223,10 @@ class RecursiveSOTAGenerator:
 
             # ── Step 5: On-the-fly Width LoRA training for next depth ─────
             if depth < effective_depth:
+                # predecessor_code was stored in metadata during _run_router
+                predecessor_code = results[-1].metadata.get("predecessor_code", sota_code)
                 self._train_next_lora(
-                    before_code=results[-1].metadata.get("predecessor_code", sota_code)
-                    if results else sota_code,
+                    before_code=predecessor_code,
                     after_code=current_sota,
                     next_gen=current_gen,
                 )
@@ -397,10 +399,10 @@ class RecursiveSOTAGenerator:
         oc_cfg = self._cfg.get("orthogonal_calibration", {})
         width_cfg = oc_cfg.get("width", {})
         adapter_root = Path(
-            width_cfg.get(
-                "adapter_output_dir",
-                self._cfg.get("training", {}).get("output_dir", "./checkpoints")
-                + "/width_adapters",
+            width_cfg.get("adapter_output_dir")
+            or str(
+                Path(self._cfg.get("training", {}).get("output_dir", "./checkpoints"))
+                / "width_adapters"
             )
         )
         adapter_dir = adapter_root / f"gen_{next_gen}"

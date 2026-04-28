@@ -475,9 +475,9 @@ def _run_orthogonal_train_stage(
 
     lr_cfg = cfg.get("lora_routing", {})
     index_path = Path(
-        lr_cfg.get(
-            "adapter_index_path",
-            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "adapter_index.json"),
+        lr_cfg.get("adapter_index_path")
+        or str(
+            Path(train_cfg.get("output_dir", "./checkpoints")) / "adapter_index.json"
         )
     )
     library = AdapterLibrary(index_path=index_path)

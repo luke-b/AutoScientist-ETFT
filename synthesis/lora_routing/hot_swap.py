@@ -45,6 +45,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_ADAPTER_NAME = "width_lora"  # Named constant for the PEFT adapter slot
+
 _PEFT_INSTALL_HINT = (
     "PEFT is required for LoRA hot-swap.  "
     "Install with: pip install 'autoscientist-etft[finetune]'"
@@ -151,7 +153,7 @@ class LoRAHotSwap:
                 self._model.disable_adapter()
             elif hasattr(self._model, "delete_adapter"):
                 try:
-                    self._model.delete_adapter("width_lora")
+                    self._model.delete_adapter(_ADAPTER_NAME)
                 except Exception:
                     pass
             self._adapter_loaded = False
@@ -163,12 +165,12 @@ class LoRAHotSwap:
             self._model = PeftModel.from_pretrained(
                 self._model,
                 adapter_path,
-                adapter_name="width_lora",
+                adapter_name=_ADAPTER_NAME,
             )
         else:
             # Load a new set of weights into the existing PeftModel
-            self._model.load_adapter(adapter_path, adapter_name="width_lora")
-            self._model.set_adapter("width_lora")
+            self._model.load_adapter(adapter_path, adapter_name=_ADAPTER_NAME)
+            self._model.set_adapter(_ADAPTER_NAME)
 
         self._adapter_loaded = True
         self._current_adapter_path = adapter_path
@@ -188,7 +190,7 @@ class LoRAHotSwap:
             if hasattr(self._model, "disable_adapter"):
                 self._model.disable_adapter()
             elif hasattr(self._model, "delete_adapter"):
-                self._model.delete_adapter("width_lora")
+                self._model.delete_adapter(_ADAPTER_NAME)
         except Exception as exc:
             logger.warning("LoRAHotSwap: error while removing adapter: %s", exc)
 
