@@ -19,7 +19,6 @@ import argparse
 import logging
 from pathlib import Path
 
-from corpus.performance_estimator.dataset_builder import PerfDatasetBuilder
 from corpus.performance_estimator.feature_extractor import extract_features
 from corpus.regression_pipeline.schemas import PerfSample
 

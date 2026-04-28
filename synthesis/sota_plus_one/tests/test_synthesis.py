@@ -214,7 +214,7 @@ def _make_candidate(code: str = _SIMPLE_SCRIPT) -> SOTAPlusOneCandidate:
     )
 
 
-def test_local_adapter_success():
+def test_local_adapter_success_simple():
     """LocalSubprocessAdapter returns a job_id string when the script succeeds."""
     from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
 
@@ -224,7 +224,7 @@ def test_local_adapter_success():
     assert "cand01" in job_id
 
 
-def test_local_adapter_failure_raises():
+def test_local_adapter_failure_raises_simple():
     """LocalSubprocessAdapter raises RuntimeError when the script fails."""
     from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
 
@@ -317,7 +317,7 @@ def _make_cluster_candidate(code: str = "print('METRIC: acc=1.0')\n") -> SOTAPlu
 
 def test_local_adapter_success(tmp_path):
     """LocalSubprocessAdapter returns a job_id string on success."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from synthesis.sota_plus_one.cluster_adapter import LocalSubprocessAdapter
 

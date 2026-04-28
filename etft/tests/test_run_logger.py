@@ -7,11 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from corpus.regression_pipeline.schemas import ExperimentResult
 from etft.run_logger import ALERT_CRITICAL, ALERT_WARNING, RunLogger
-
 
 # ---------------------------------------------------------------------------
 # Helpers

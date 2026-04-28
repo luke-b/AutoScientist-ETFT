@@ -244,6 +244,7 @@ def test_bootstrap_generates_expected_counts(tmp_path):
 def test_bootstrap_labels_balanced(tmp_path):
     """Bootstrap data contains equal counts of label=0 and label=1."""
     import json
+
     from corpus.performance_estimator.bootstrap import generate_bootstrap_data
 
     out = tmp_path / "bootstrap.jsonl"
@@ -258,6 +259,7 @@ def test_bootstrap_labels_balanced(tmp_path):
 def test_bootstrap_features_non_empty(tmp_path):
     """Each bootstrap record must have a non-empty features dict."""
     import json
+
     from corpus.performance_estimator.bootstrap import generate_bootstrap_data
 
     out = tmp_path / "bootstrap.jsonl"

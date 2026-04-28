@@ -72,7 +72,7 @@ class FeedbackRouter:
         cls,
         data_root: Path,
         cfg: dict | None = None,
-    ) -> "FeedbackRouter":
+    ) -> FeedbackRouter:
         """
         Convenience factory that creates a :class:`FeedbackRouter` with the
         full historical failure log pre-loaded from *data_root*.

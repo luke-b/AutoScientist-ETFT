@@ -7,13 +7,11 @@ All LLM and arXiv calls are mocked so tests run offline in CI.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from agents.literature.searcher import PaperRecord
-from corpus.regression_pipeline.schemas import ResearchBrief
 from etft.skills.base import LLMResponse
 
 _SIMPLE_ALGO = "x = 1\nprint('METRIC: accuracy=0.5')\n"
@@ -105,7 +103,6 @@ def test_pipeline_resume_skips_corpus(tmp_path):
     _save_state(state, tmp_path)
 
     call_count = {"corpus": 0}
-    original_corpus = None
 
     import pipeline as _pl
     original = _pl._run_corpus_stage
