@@ -41,7 +41,7 @@ def create_research_agent(
     Returns
     -------
     AgentClient
-        A fully configured agent with all 16 domain skills registered.
+        A fully configured agent with all 18 domain skills registered.
     """
     from etft.agent import AgentClient
     from etft.skills.analysis_skills import (

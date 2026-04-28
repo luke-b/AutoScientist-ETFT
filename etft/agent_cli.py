@@ -68,7 +68,8 @@ def main() -> None:
     context: dict = {}
     if args.context_file:
         try:
-            context = json.loads(open(args.context_file).read())
+            with open(args.context_file) as f:
+                context = json.load(f)
         except Exception as exc:
             logger.error("Failed to load context file %r: %s", args.context_file, exc)
             sys.exit(1)
