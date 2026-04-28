@@ -76,8 +76,9 @@ class SOTAPlusOneSynthesizer:
     """Generates SOTA+1 candidates by fusing trajectory context with ARL outputs."""
 
     def __init__(self, cfg: dict | None = None) -> None:
+        self._cfg = cfg or {}
         self._agent = AgentClient(cfg, skills=DEFAULT_SKILLS)
-        synth_cfg = (cfg or {}).get("synthesis", {}).get("sota_plus_one", {})
+        synth_cfg = self._cfg.get("synthesis", {}).get("sota_plus_one", {})
         self.max_candidates: int = int(synth_cfg.get("max_candidates", 3))
 
     # ------------------------------------------------------------------
@@ -89,9 +90,16 @@ class SOTAPlusOneSynthesizer:
         brief: ResearchBrief,
         empirical_summary: dict | None = None,
         rl_context: str = "",
+        trajectory_steps: list | None = None,
+        generation_index: int = 0,
     ) -> list[SOTAPlusOneCandidate]:
         """
         Generate up to ``max_candidates`` SOTA+1 proposals.
+
+        When ``cfg.lora_routing.enabled`` is ``True`` the Dynamic LoRA Router
+        is used (three-phase: depth analysis → RAG → Width synthesis).
+        Otherwise the existing proxy-based generation path is used, preserving
+        full backward compatibility.
 
         Parameters
         ----------
@@ -110,7 +118,26 @@ class SOTAPlusOneSynthesizer:
             signals from prior triage rejections or physical evaluation failures
             in the same campaign.  When provided it is prepended to the agent
             context so the synthesizer avoids repeating known failure patterns.
+        trajectory_steps:
+            Optional ordered list of ``TrajectoryStep`` objects for the
+            Dynamic LoRA Router's depth analysis phase.
+        generation_index:
+            Hint for which generation's Width LoRA to use (passed to the router).
         """
+        # ── Dynamic LoRA routing path (opt-in) ──────────────────────────────
+        lr_enabled = bool(
+            getattr(self, "_cfg", {}).get("lora_routing", {}).get("enabled", False)
+        )
+        if lr_enabled:
+            return self._generate_via_router(
+                sota_code=sota_code,
+                trajectory_id=trajectory_id,
+                bottleneck=bottleneck,
+                trajectory_steps=trajectory_steps,
+                generation_index=generation_index,
+            )
+
+        # ── Existing proxy path (default) ───────────────────────────────────
         emp_text = _format_empirical(empirical_summary)
 
         candidates: list[SOTAPlusOneCandidate] = []
@@ -159,6 +186,61 @@ class SOTAPlusOneSynthesizer:
             )
 
         logger.info("Generated %d valid SOTA+1 candidates.", len(candidates))
+        return candidates
+
+    # ------------------------------------------------------------------
+    def _generate_via_router(
+        self,
+        sota_code: str,
+        trajectory_id: str,
+        bottleneck: str,
+        trajectory_steps: list | None,
+        generation_index: int,
+    ) -> list[SOTAPlusOneCandidate]:
+        """Generate candidates using the Dynamic LoRA Router (opt-in path)."""
+        from synthesis.lora_routing.router import DynamicLoRARouter
+
+        router = DynamicLoRARouter(cfg=getattr(self, "_cfg", {}))
+        candidates: list[SOTAPlusOneCandidate] = []
+
+        for i in range(self.max_candidates):
+            logger.info(
+                "Generating SOTA+1 candidate %d / %d via DynamicLoRARouter …",
+                i + 1, self.max_candidates,
+            )
+            result = router.route(
+                sota_code=sota_code,
+                trajectory_steps=trajectory_steps or [],
+                generation_index=generation_index,
+            )
+            if not result.success or not result.code:
+                logger.warning(
+                    "Router candidate %d failed: %s", i + 1, result.error
+                )
+                continue
+
+            candidates.append(
+                SOTAPlusOneCandidate(
+                    candidate_id=str(uuid.uuid4())[:8],
+                    trajectory_id=trajectory_id,
+                    code=result.code,
+                    rationale=result.rationale,
+                    provenance={
+                        "bottleneck": (
+                            result.depth_analysis.bottleneck
+                            if result.depth_analysis else bottleneck
+                        ),
+                        "adapter_used": result.adapter_used,
+                        "papers_retrieved": result.papers_retrieved,
+                        "generation_index": generation_index,
+                        "routing_mode": "dynamic_lora",
+                    },
+                )
+            )
+
+        logger.info(
+            "DynamicLoRARouter generated %d valid SOTA+1 candidates.", len(candidates)
+        )
         return candidates
 
 

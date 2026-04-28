@@ -212,6 +212,43 @@ cluster:
     service_account: ""          # optional Kubernetes service account
 
 # ---------------------------------------------------------------------------
+# Orthogonal Calibration (Width/Depth training split + Objective Calibration)
+# Splits fine-tuning into two orthogonal axes to prevent trajectory overfitting.
+# The Depth Historian is trained on the full trajectory (𝒟_Gen + 𝒟_Rationale).
+# Each Width Specialist is trained on lateral solutions for a single jump aₙ₋₁→aₙ.
+# ---------------------------------------------------------------------------
+orthogonal_calibration:
+  width:
+    lateral_variants_per_jump: 4     # diverse lateral solutions generated per jump
+    performance_tolerance: 0.05      # max fractional static-metric delta vs historical aₙ
+    adapter_output_dir: "./checkpoints/width_adapters"
+  depth:
+    adapter_output_dir: "./checkpoints/depth_adapter"
+  recursive:
+    enabled: true
+    max_sota_plus_x: 2               # max recursive SOTA+x depth (1=SOTA+1, 2=SOTA+2, …)
+  objective_calibration:
+    diversity_threshold: 0.3         # min architectural diversity from historical aₙ
+    performance_tolerance: 0.05      # max performance delta for quality gate
+    similarity_metric: "composite"   # same options as calibration.similarity_metric
+    similarity_weights: [0.4, 0.3, 0.3]  # (w_jaccard, w_lcs, w_ast)
+
+# ---------------------------------------------------------------------------
+# Dynamic LoRA Routing (Inference-Time Orchestration)
+# When enabled=true the synthesizer uses three-phase inference:
+#   1. Depth Analysis (base Foundation Model, no LoRA)
+#   2. Agentic RAG retrieval from the depth analysis bottleneck
+#   3. Width Synthesis with hot-swapped generational Width LoRA
+# When enabled=false (default) the existing proxy path is used unchanged.
+# ---------------------------------------------------------------------------
+lora_routing:
+  enabled: false                     # opt-in; false = existing proxy path (backward compat)
+  foundation_model: null             # null = inherits from training.base_model
+  device: "auto"                     # "auto" | "cpu" | "cuda" | "cuda:0"
+  max_new_tokens: 2048
+  adapter_index_path: "./checkpoints/adapter_index.json"
+
+# ---------------------------------------------------------------------------
 # Fine-tuning
 # ---------------------------------------------------------------------------
 training:
