@@ -35,7 +35,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-_ALL_STAGES = ("corpus", "analyse", "train", "calibrate", "arl", "generate")
+_ALL_STAGES = ("corpus", "analyse", "train", "calibrate", "arl", "generate", "orthogonal_train", "recursive_generate")
 
 # ---------------------------------------------------------------------------
 # Pipeline state helpers
@@ -435,6 +435,250 @@ def _run_generate_stage(
     return results
 
 
+def _run_orthogonal_train_stage(
+    cfg: dict,
+    target: str,
+    data_root: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Run the Orthogonal Training stage.
+
+    1. Train the Depth Historian LoRA on the full trajectory corpus.
+    2. For each generation found in ``data_root/d_gen/``, build a Width
+       dataset (using ``WidthDatasetBuilder``) and train a Width LoRA.
+    3. Register all adapters in the ``AdapterLibrary``.
+
+    Returns a summary dict with adapter paths and dataset statistics.
+    """
+    from corpus.orthogonal.width_dataset_builder import WidthDatasetBuilder
+    from corpus.regression_pipeline.schemas import TrajectoryStep
+    from synthesis.lora_routing.adapter_library import AdapterLibrary
+    from train import train as _train
+
+    oc_cfg = cfg.get("orthogonal_calibration", {})
+    width_cfg = oc_cfg.get("width", {})
+    train_cfg = cfg.get("training", {})
+
+    depth_adapter_dir = Path(
+        oc_cfg.get("depth", {}).get(
+            "adapter_output_dir",
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "depth_adapter"),
+        )
+    )
+    width_adapter_root = Path(
+        width_cfg.get(
+            "adapter_output_dir",
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "width_adapters"),
+        )
+    )
+
+    lr_cfg = cfg.get("lora_routing", {})
+    index_path = Path(
+        lr_cfg.get("adapter_index_path")
+        or str(
+            Path(train_cfg.get("output_dir", "./checkpoints")) / "adapter_index.json"
+        )
+    )
+    library = AdapterLibrary(index_path=index_path)
+
+    summary: dict[str, Any] = {
+        "depth_adapter": None,
+        "width_adapters": [],
+        "n_generations": 0,
+    }
+
+    # ── 1. Depth Historian training ────────────────────────────────────────
+    model_name: str = train_cfg.get("base_model", "meta-llama/Meta-Llama-3-8B")
+    logger.info("[orthogonal_train] Training Depth Historian LoRA …")
+    try:
+        _train(
+            cfg=cfg,
+            model_name=model_name,
+            data_root=data_root,
+            output_dir=depth_adapter_dir,
+            training_mode="depth",
+        )
+        summary["depth_adapter"] = str(depth_adapter_dir)
+        logger.info("[orthogonal_train] Depth Historian adapter saved → %s", depth_adapter_dir)
+    except SystemExit as exc:
+        logger.warning(
+            "[orthogonal_train] Depth training skipped (finetune deps not installed): %s", exc
+        )
+
+    # ── 2. Width Specialist training for each generation ──────────────────
+    # Load trajectory steps to discover available generation pairs
+    trajectory_steps = _load_trajectory_steps(data_root, target, held_out_frac=0.0)
+    sorted_steps = sorted(trajectory_steps, key=lambda s: s.step_index)
+    n_pairs = len(sorted_steps) - 1 if len(sorted_steps) >= 2 else 0
+    summary["n_generations"] = n_pairs
+
+    if n_pairs == 0:
+        logger.info(
+            "[orthogonal_train] No trajectory step pairs found — "
+            "skipping Width LoRA training."
+        )
+    else:
+        from etft.agent import AgentClient
+        agent = AgentClient(cfg)
+        width_builder = WidthDatasetBuilder(cfg=cfg, agent=agent)
+
+        for idx in range(n_pairs):
+            before_step = sorted_steps[idx]
+            after_step = sorted_steps[idx + 1]
+            gen_n = after_step.step_index
+
+            logger.info(
+                "[orthogonal_train] Building Width dataset for gen_%d "
+                "(%s → %s) …",
+                gen_n, before_step.algorithm_id, after_step.algorithm_id,
+            )
+            try:
+                width_record = width_builder.build(
+                    before=before_step,
+                    after=after_step,
+                    generation_index=gen_n,
+                    output_dir=data_root / "d_width",
+                )
+
+                if width_record.variants_accepted == 0:
+                    logger.warning(
+                        "[orthogonal_train] gen_%d: no Width variants accepted — "
+                        "skipping Width LoRA training.",
+                        gen_n,
+                    )
+                    continue
+
+                adapter_dir = width_adapter_root / f"gen_{gen_n}"
+                try:
+                    _train(
+                        cfg=cfg,
+                        model_name=model_name,
+                        data_root=data_root,
+                        output_dir=adapter_dir,
+                        training_mode="width",
+                        generation_index=gen_n,
+                    )
+                    record = library.register(
+                        generation_index=gen_n,
+                        adapter_path=adapter_dir,
+                        metadata={
+                            "before_algorithm_id": before_step.algorithm_id,
+                            "after_algorithm_id": after_step.algorithm_id,
+                            "width_dataset_path": width_record.output_path,
+                            "variants_accepted": width_record.variants_accepted,
+                        },
+                    )
+                    summary["width_adapters"].append({
+                        "generation": gen_n,
+                        "adapter_path": str(adapter_dir),
+                        "validated": record.validated,
+                    })
+                    logger.info(
+                        "[orthogonal_train] Width LoRA gen_%d trained and registered.",
+                        gen_n,
+                    )
+                except SystemExit as exc:
+                    logger.warning(
+                        "[orthogonal_train] Width training gen_%d skipped "
+                        "(finetune deps not installed): %s",
+                        gen_n, exc,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[orthogonal_train] gen_%d failed: %s — continuing.", gen_n, exc
+                )
+
+    _log_event(state, "orthogonal_train", {
+        "depth_adapter": summary["depth_adapter"],
+        "n_width_adapters": len(summary["width_adapters"]),
+        "n_generations": n_pairs,
+    })
+    logger.info(
+        "[orthogonal_train] Done. Depth: %s, Width adapters: %d",
+        summary["depth_adapter"] or "(skipped)",
+        len(summary["width_adapters"]),
+    )
+    return summary
+
+
+def _run_recursive_generate_stage(
+    cfg: dict,
+    sota_code: str,
+    bottleneck: str,
+    generation_index: int,
+    data_root: Path,
+    state: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """
+    Run the Recursive SOTA+x Generation stage.
+
+    Calls ``RecursiveSOTAGenerator.generate()`` and persists all
+    ``RecursiveResult`` records to ``data/candidates/recursive/``.
+
+    Parameters
+    ----------
+    cfg:
+        Runtime configuration dict.
+    sota_code:
+        Source code of the current SOTA.
+    bottleneck:
+        Bottleneck component name (for logging / metadata).
+    generation_index:
+        Current generation index (used to select the Width LoRA).
+    data_root:
+        Root data directory.
+    state:
+        Pipeline state dict (mutated in place).
+
+    Returns
+    -------
+    list[dict]
+        JSON-serialisable list of RecursiveResult dicts.
+    """
+    from synthesis.recursive_loop import RecursiveSOTAGenerator
+
+    oc_cfg = cfg.get("orthogonal_calibration", {})
+    rec_cfg = oc_cfg.get("recursive", {})
+    max_depth = int(rec_cfg.get("max_sota_plus_x", 2))
+
+    output_dir = data_root / "candidates" / "recursive"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(
+        "[recursive_generate] Running Recursive SOTA+%d loop for bottleneck '%s' …",
+        max_depth, bottleneck,
+    )
+
+    trajectory_steps = _load_trajectory_steps(data_root, bottleneck, held_out_frac=0.0)
+
+    generator = RecursiveSOTAGenerator(cfg=cfg)
+    results = generator.generate(
+        sota_code=sota_code,
+        generation_index=generation_index,
+        max_depth=max_depth,
+        trajectory_steps=trajectory_steps,
+        output_dir=output_dir,
+    )
+
+    result_dicts = [r.model_dump() for r in results]
+
+    n_accepted = sum(1 for r in results if r.sandbox_passed and r.passed_gate)
+    _log_event(state, "recursive_generate", {
+        "bottleneck": bottleneck,
+        "max_depth": max_depth,
+        "n_results": len(results),
+        "n_accepted": n_accepted,
+    })
+    state.setdefault("recursive_results", []).extend(result_dicts)
+
+    logger.info(
+        "[recursive_generate] Done. %d / %d depth(s) accepted.",
+        n_accepted, len(results),
+    )
+    return result_dicts
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -545,6 +789,21 @@ def run_pipeline(
                 cfg, seed_code, target, arl_summary, data_root, state
             )
 
+        elif current_stage == "orthogonal_train":
+            result["orthogonal_train"] = _run_orthogonal_train_stage(
+                cfg, target, data_root, state
+            )
+
+        elif current_stage == "recursive_generate":
+            # Use the top_bottleneck from the analyse stage if available
+            bottleneck = state.get("top_bottleneck") or target
+            # Use the trajectory length as the current generation index
+            trajectory_steps = _load_trajectory_steps(data_root, bottleneck, held_out_frac=0.0)
+            gen_index = max((s.step_index for s in trajectory_steps), default=0)
+            result["recursive_generate"] = _run_recursive_generate_stage(
+                cfg, seed_code, bottleneck, gen_index, data_root, state
+            )
+
         state.setdefault("completed_stages", [])
         if current_stage not in state["completed_stages"]:
             state["completed_stages"].append(current_stage)
@@ -614,6 +873,17 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Validate config.yaml against the schema and exit (0 = valid, 1 = invalid).",
     )
+    parser.add_argument(
+        "--lora-routing",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable Dynamic LoRA Routing (Inference-Time Orchestration). "
+            "Sets lora_routing.enabled=true at runtime, activating three-phase "
+            "inference (depth analysis → RAG → Width synthesis with hot-swapped LoRA). "
+            "Requires the [finetune] extras and Width LoRA adapters to be trained first."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -648,6 +918,11 @@ def main() -> None:
         seed_code = "# Placeholder SOTA algorithm\ndef model(x):\n    return x\n"
 
     data_root = Path(args.data_root) if args.data_root else None
+
+    # Apply --lora-routing flag by overriding the config at runtime
+    if args.lora_routing:
+        cfg.setdefault("lora_routing", {})["enabled"] = True
+        logger.info("[pipeline] Dynamic LoRA Routing enabled via --lora-routing flag.")
 
     run_pipeline(
         cfg=cfg,

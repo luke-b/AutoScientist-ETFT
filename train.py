@@ -77,6 +77,57 @@ def build_dataset(data_root: Path) -> tuple[list[dict], list[dict]]:
     return examples, file_infos
 
 
+def build_width_dataset(
+    data_root: Path,
+    generation_index: int,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Load the Width training dataset for a specific generation index.
+
+    The Width dataset lives under ``data_root/d_width/gen_{generation_index}/``.
+    These files are produced by ``WidthDatasetBuilder`` and contain
+    architecturally diverse lateral solutions for a single generational jump.
+
+    Parameters
+    ----------
+    data_root:
+        Root data directory.
+    generation_index:
+        The evolutionary generation index ``n`` to load Width data for.
+
+    Returns
+    -------
+    tuple[list[dict], list[dict]]
+        A (examples, file_infos) pair.
+    """
+    examples: list[dict] = []
+    file_infos: list[dict] = []
+
+    width_dir = data_root / "d_width" / f"gen_{generation_index}"
+    if not width_dir.exists():
+        raise FileNotFoundError(
+            f"Width dataset directory not found: {width_dir}. "
+            f"Run WidthDatasetBuilder for generation {generation_index} first."
+        )
+
+    for jsonl_file in sorted(width_dir.glob("*.jsonl")):
+        file_records = _load_jsonl(jsonl_file)
+        examples.extend(file_records)
+        checksum = _sha256(jsonl_file)
+        file_infos.append({
+            "path": str(jsonl_file),
+            "records": len(file_records),
+            "sha256": checksum,
+            "generation_index": generation_index,
+        })
+        logger.info(
+            "Loaded %d Width examples from %s (gen_%d)",
+            len(file_records), jsonl_file, generation_index,
+        )
+
+    return examples, file_infos
+
+
 def _sha256(path: Path) -> str:
     """Return the hex SHA-256 digest of the file at *path*."""
     h = hashlib.sha256()
@@ -92,12 +143,33 @@ def write_corpus_manifest(
     file_infos: list[dict],
     model_name: str,
     cfg: dict,
+    training_mode: str = "depth",
+    generation_index: int | None = None,
 ) -> Path:
     """
     Write ``corpus_manifest.json`` into *output_dir*.
 
-    Records dataset files, record counts, checksums, the model name, and the
-    full config snapshot so each checkpoint is traceable to its training data.
+    Records dataset files, record counts, checksums, the model name, the
+    training mode (``"depth"`` or ``"width"``), and the full config snapshot
+    so each checkpoint is traceable to its training data.
+
+    Parameters
+    ----------
+    output_dir:
+        Directory to write the manifest into.
+    data_root:
+        Root data directory used during training.
+    file_infos:
+        Per-file records from ``build_dataset`` or ``build_width_dataset``.
+    model_name:
+        Base model name or checkpoint path.
+    cfg:
+        Full runtime config dict snapshotted into the manifest.
+    training_mode:
+        ``"depth"`` for the full-trajectory Depth Historian adapter or
+        ``"width"`` for a single-generation Width Specialist adapter.
+    generation_index:
+        For ``training_mode="width"``, the generation index this adapter covers.
 
     Returns
     -------
@@ -110,6 +182,8 @@ def write_corpus_manifest(
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
         "model_name": model_name,
         "data_root": str(data_root),
+        "training_mode": training_mode,
+        "generation_index": generation_index,
         "total_records": sum(fi["records"] for fi in file_infos),
         "files": file_infos,
         "config_snapshot": cfg,
@@ -125,7 +199,67 @@ def write_corpus_manifest(
 # Core training logic (requires [finetune] extras)
 # ---------------------------------------------------------------------------
 
-def train(cfg: dict, model_name: str, data_root: Path, output_dir: Path) -> None:
+
+def _load_training_examples(
+    data_root: Path,
+    training_mode: str,
+    generation_index: int | None,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Dispatch to the correct dataset loader based on *training_mode*.
+
+    Parameters
+    ----------
+    data_root:
+        Root data directory.
+    training_mode:
+        ``"depth"`` → full corpus (𝒟_Gen + 𝒟_Rationale).
+        ``"width"`` → Width dataset for *generation_index*.
+    generation_index:
+        Required when *training_mode* is ``"width"``.
+
+    Returns
+    -------
+    tuple[list[dict], list[dict]]
+        (examples, file_infos)
+    """
+    if training_mode == "width":
+        if generation_index is None:
+            raise ValueError("training_mode='width' requires generation_index to be set.")
+        return build_width_dataset(data_root, generation_index)
+    # default: "depth" — full trajectory corpus
+    return build_dataset(data_root)
+
+
+def train(
+    cfg: dict,
+    model_name: str,
+    data_root: Path,
+    output_dir: Path,
+    training_mode: str = "depth",
+    generation_index: int | None = None,
+) -> None:
+    """
+    Fine-tune an LLM on the ETFT corpus using HuggingFace PEFT/LoRA.
+
+    Parameters
+    ----------
+    cfg:
+        Runtime configuration dict (from ``config.yaml``).
+    model_name:
+        HuggingFace model name or local path for the base model.
+    data_root:
+        Root data directory used to load the training corpus.
+    output_dir:
+        Directory to save the trained LoRA checkpoint.
+    training_mode:
+        ``"depth"`` — train on the full trajectory corpus (𝒟_Gen + 𝒟_Rationale).
+        ``"width"`` — train on the Width dataset for a specific generation
+        (requires ``generation_index`` to be set).
+    generation_index:
+        When ``training_mode="width"``, the generation index whose Width dataset
+        is loaded from ``data_root/d_width/gen_{generation_index}/``.
+    """
     try:
         from datasets import Dataset
         from peft import LoraConfig, get_peft_model
@@ -161,12 +295,21 @@ def train(cfg: dict, model_name: str, data_root: Path, output_dir: Path) -> None
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    raw_examples, file_infos = build_dataset(data_root)
+    raw_examples, file_infos = _load_training_examples(
+        data_root, training_mode, generation_index
+    )
     if not raw_examples:
-        raise SystemExit(f"No training examples found under {data_root}. Generate the corpus first.")
+        raise SystemExit(
+            f"No training examples found under {data_root} "
+            f"(mode={training_mode}, generation={generation_index}). "
+            "Generate the corpus first."
+        )
 
     # Write corpus manifest before training so the checkpoint is traceable
-    write_corpus_manifest(output_dir, data_root, file_infos, model_name, cfg)
+    write_corpus_manifest(
+        output_dir, data_root, file_infos, model_name, cfg,
+        training_mode=training_mode, generation_index=generation_index,
+    )
 
     def tokenize(example: dict) -> dict:
         prompt = example.get("prompt", "")
@@ -297,7 +440,10 @@ def eval_only(cfg: dict, model_name: str, data_root: Path, checkpoint_dir: Path)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Fine-tune an LLM on the ETFT corpus (𝒟_Gen + 𝒟_Rationale)."
+        description=(
+            "Fine-tune an LLM on the ETFT corpus (𝒟_Gen + 𝒟_Rationale) or on a "
+            "Width dataset for a specific generation (Orthogonal Calibration)."
+        )
     )
     parser.add_argument(
         "--dataset",
@@ -328,6 +474,29 @@ def parse_args() -> argparse.Namespace:
             "without training.  Requires --output-dir to point at a saved checkpoint."
         ),
     )
+    parser.add_argument(
+        "--mode",
+        choices=["depth", "width"],
+        default="depth",
+        help=(
+            "Training mode for Orthogonal Calibration:\n"
+            "  depth  — train the Depth Historian on the full trajectory corpus "
+            "(𝒟_Gen + 𝒟_Rationale). This is the default and produces a LoRA "
+            "adapter that understands the macro-vector of innovation.\n"
+            "  width  — train a Width Specialist on the lateral Width dataset for "
+            "a specific generation. Requires --generation to be set."
+        ),
+    )
+    parser.add_argument(
+        "--generation",
+        type=int,
+        default=None,
+        help=(
+            "Generation index n for --mode width. "
+            "Loads data/d_width/gen_{n}/ and saves the adapter to "
+            "checkpoints/width_adapters/gen_{n}/ (unless --output-dir overrides)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -336,15 +505,35 @@ def main() -> None:
     cfg = load_config(args.config)
 
     model_name = args.model or cfg["training"]["base_model"]
-    output_dir = Path(args.output_dir or cfg["training"]["output_dir"])
     data_root = Path(args.dataset)
+
+    # Determine output directory based on training mode
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    elif args.mode == "width" and args.generation is not None:
+        width_adapter_root = oc_cfg.get("width", {}).get(
+            "adapter_output_dir",
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "width_adapters"),
+        )
+        output_dir = Path(width_adapter_root) / f"gen_{args.generation}"
+    else:
+        oc_cfg = cfg.get("orthogonal_calibration", {})
+        depth_adapter_dir = oc_cfg.get("depth", {}).get(
+            "adapter_output_dir",
+            str(Path(train_cfg.get("output_dir", "./checkpoints")) / "depth_adapter"),
+        )
+        output_dir = Path(depth_adapter_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.eval_only:
         eval_only(cfg, model_name, data_root, output_dir)
     else:
-        train(cfg, model_name, data_root, output_dir)
+        train(
+            cfg, model_name, data_root, output_dir,
+            training_mode=args.mode,
+            generation_index=args.generation,
+        )
 
 
 if __name__ == "__main__":

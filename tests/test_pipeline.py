@@ -232,3 +232,142 @@ def test_pipeline_state_written_to_disk(tmp_path):
     assert state_file.exists(), "pipeline_state.json was not written to disk"
     on_disk = json.loads(state_file.read_text())
     assert "corpus" in on_disk["completed_stages"]
+
+
+# ---------------------------------------------------------------------------
+# New stage: orthogonal_train (lora_routing.enabled=false)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_orthogonal_train_stage_no_trajectory(tmp_path):
+    """
+    orthogonal_train stage with no trajectory steps runs without error
+    (skips Width LoRA training; Depth training is skipped due to missing [finetune] deps).
+    """
+    from pipeline import run_pipeline
+
+    result = run_pipeline(
+        cfg={"lora_routing": {"enabled": False}},
+        target="test_oc",
+        seed_code=_SIMPLE_ALGO,
+        data_root=tmp_path,
+        stage="orthogonal_train",
+    )
+
+    state = result["state"]
+    assert "orthogonal_train" in state["completed_stages"]
+    assert "orthogonal_train" in result
+    assert result["orthogonal_train"]["n_generations"] == 0
+
+
+def test_pipeline_orthogonal_train_with_corpus(tmp_path):
+    """
+    orthogonal_train stage discovers trajectory steps from the corpus stage.
+    """
+    from pipeline import _load_state, _save_state, run_pipeline
+
+    predecessor_response = _make_llm_response(f"```python\n{_SIMPLE_ALGO}```")
+
+    with patch("etft.llm.LLMClient.complete_with_tools", return_value=predecessor_response):
+        run_pipeline(
+            cfg={},
+            target="test_family_oc",
+            seed_code=_SIMPLE_ALGO,
+            seed_fitness=1.0,
+            depth=2,
+            data_root=tmp_path,
+            stage="corpus",
+        )
+
+    # Now run orthogonal_train — should find the trajectory steps
+    result = run_pipeline(
+        cfg={"lora_routing": {"enabled": False}},
+        target="test_family_oc",
+        seed_code=_SIMPLE_ALGO,
+        data_root=tmp_path,
+        stage="orthogonal_train",
+        resume=True,
+    )
+
+    assert "orthogonal_train" in result["state"]["completed_stages"]
+    ot = result["orthogonal_train"]
+    assert "n_generations" in ot
+
+
+# ---------------------------------------------------------------------------
+# New stage: recursive_generate (lora_routing.enabled=false fallback)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_recursive_generate_stage_empty_trajectory(tmp_path):
+    """
+    recursive_generate with no trajectory runs router which falls back to proxy.
+    Router produces empty code → sandbox fails → result list has failed results.
+    """
+    from pipeline import run_pipeline
+
+    # Depth analysis response + synthesis response
+    depth_response = _make_llm_response(
+        "BOTTLENECK: test\nSTRUCTURAL_SUMMARY: none\nRECOMMENDED_EPOCH: 0\n"
+    )
+    synthesis_response = _make_llm_response(f"```python\n{_SIMPLE_ALGO}```\nRATIONALE: test")
+
+    call_count = [0]
+
+    def _mock_complete(messages, tools=None):
+        call_count[0] += 1
+        if call_count[0] <= 2:
+            return depth_response
+        return synthesis_response
+
+    with (
+        patch("etft.llm.LLMClient.complete_with_tools", side_effect=_mock_complete),
+        patch("agents.literature.searcher.LiteratureSearcher.search", return_value=[]),
+        patch("agents.literature.retriever.httpx.get", side_effect=Exception("no network")),
+    ):
+        result = run_pipeline(
+            cfg={
+                "lora_routing": {"enabled": False},
+                "orthogonal_calibration": {
+                    "recursive": {"enabled": True, "max_sota_plus_x": 1},
+                    "objective_calibration": {
+                        "diversity_threshold": 0.0,
+                        "performance_tolerance": 10.0,
+                    },
+                },
+                "sandbox": {"backend": "subprocess", "timeout_seconds": 10},
+            },
+            target="test_rec",
+            seed_code=_SIMPLE_ALGO,
+            data_root=tmp_path,
+            stage="recursive_generate",
+        )
+
+    state = result["state"]
+    assert "recursive_generate" in state["completed_stages"]
+    assert "recursive_generate" in result
+
+
+# ---------------------------------------------------------------------------
+# New stages appear in _ALL_STAGES
+# ---------------------------------------------------------------------------
+
+
+def test_all_stages_includes_new_stages():
+    from pipeline import _ALL_STAGES
+    assert "orthogonal_train" in _ALL_STAGES
+    assert "recursive_generate" in _ALL_STAGES
+
+
+# ---------------------------------------------------------------------------
+# Invalid new stage raises ValueError
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_invalid_new_stage_raises(tmp_path):
+    with pytest.raises(ValueError, match="Unknown stage"):
+        from pipeline import run_pipeline
+        run_pipeline(
+            cfg={}, target="x", seed_code="pass\n",
+            data_root=tmp_path, stage="not_a_stage",
+        )

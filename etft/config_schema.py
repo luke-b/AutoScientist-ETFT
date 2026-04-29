@@ -297,6 +297,50 @@ class CalibrationConfig(_AllowExtra):
 # ---------------------------------------------------------------------------
 
 
+class OrthogonalWidthConfig(_AllowExtra):
+    lateral_variants_per_jump: int = 4
+    performance_tolerance: float = 0.05
+    adapter_output_dir: str = "./checkpoints/width_adapters"
+
+
+class OrthogonalDepthConfig(_AllowExtra):
+    adapter_output_dir: str = "./checkpoints/depth_adapter"
+
+
+class OrthogonalRecursiveConfig(_AllowExtra):
+    enabled: bool = True
+    max_sota_plus_x: int = 2
+
+
+class ObjectiveCalibrationConfig(_AllowExtra):
+    diversity_threshold: float = Field(0.3, ge=0.0, le=1.0)
+    performance_tolerance: float = Field(0.05, ge=0.0)
+    similarity_metric: str = "composite"
+    similarity_weights: list[float] = Field(default_factory=lambda: [0.4, 0.3, 0.3])
+
+
+class OrthogonalCalibrationConfig(_AllowExtra):
+    width: OrthogonalWidthConfig = Field(default_factory=OrthogonalWidthConfig)
+    depth: OrthogonalDepthConfig = Field(default_factory=OrthogonalDepthConfig)
+    recursive: OrthogonalRecursiveConfig = Field(default_factory=OrthogonalRecursiveConfig)
+    objective_calibration: ObjectiveCalibrationConfig = Field(
+        default_factory=ObjectiveCalibrationConfig
+    )
+
+
+class LoRARoutingConfig(_AllowExtra):
+    enabled: bool = False
+    foundation_model: str | None = None
+    device: str = "auto"
+    max_new_tokens: int = 2048
+    adapter_index_path: str = "./checkpoints/adapter_index.json"
+
+
+# ---------------------------------------------------------------------------
+# Root config
+# ---------------------------------------------------------------------------
+
+
 class ETFTConfig(_AllowExtra):
     """Root configuration model for the full config.yaml."""
 
@@ -312,3 +356,7 @@ class ETFTConfig(_AllowExtra):
     synthesis: SynthesisConfig = Field(default_factory=SynthesisConfig)
     cluster: ClusterConfig = Field(default_factory=ClusterConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    orthogonal_calibration: OrthogonalCalibrationConfig = Field(
+        default_factory=OrthogonalCalibrationConfig
+    )
+    lora_routing: LoRARoutingConfig = Field(default_factory=LoRARoutingConfig)
