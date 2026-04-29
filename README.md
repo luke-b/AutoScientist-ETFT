@@ -323,23 +323,65 @@ By combining **historical evolutionary trajectories** with **autonomous empirica
 
 ```
 AutoScientist-ETFT/
+│
+├── pipeline.py                    # Top-level orchestrator — all 8 pipeline stages
+├── train.py                       # Fine-tuning entrypoint (HuggingFace PEFT/LoRA)
+├── reporting.py                   # etft-report CLI — run summary table viewer
+├── config.yaml                    # Central runtime config (Pydantic-validated)
+│
+├── 📂 etft/                       # Core agent/LLM infrastructure package
+│   ├── agent.py                   # AgentClient — ReAct (Reason + Act) loop
+│   ├── agent_cli.py               # etft-agent CLI wrapper
+│   ├── agent_factory.py           # Wires domain skills to agent instances
+│   ├── llm.py                     # LLMClient — HTTP proxy to coding-agent container
+│   ├── config.py / config_schema.py  # Pydantic-validated config loader
+│   ├── container.py               # Docker container lifecycle management
+│   ├── run_logger.py              # Structured JSONL + optional MLflow logging
+│   ├── sandbox.py                 # Isolated code execution (Docker / subprocess)
+│   └── skills/                    # Tool definitions for the agent's ReAct loop
+│       ├── base.py                # Skill ABC, SkillRegistry, LLMResponse, AgentResult
+│       ├── analysis_skills.py
+│       ├── code_skills.py
+│       ├── experiment_skills.py
+│       ├── feedback_skills.py
+│       ├── filter_skills.py
+│       ├── literature_skills.py
+│       └── synthesis_skill.py
+│
 ├── 📂 corpus/
-│   ├── regression_pipeline/    # AI-Assisted Top-Down Regression (𝒟_Gen, 𝒟_Rationale)
-│   └── performance_estimator/  # Probabilistic Heuristic Filter (𝒟_Perf)
+│   ├── regression_pipeline/       # AI-Assisted Top-Down Regression (𝒟_Gen, 𝒟_Rationale)
+│   ├── performance_estimator/     # Probabilistic Heuristic Filter (𝒟_Perf)
+│   └── orthogonal/                # Width/Depth training split dataset builder
+│
 ├── 📂 calibration/
-│   ├── engine.py               # CalibrationEngine — Evolutionary Replay orchestrator
-│   ├── replay.py               # ReplaySession — model-driven step reconstruction
-│   ├── stage_gate.py           # StageGate — blocks synthesis until C ≥ threshold
-│   └── similarity.py           # Sim() functions: token Jaccard, LCS, AST, composite
+│   ├── engine.py                  # CalibrationEngine — Evolutionary Replay orchestrator
+│   ├── replay.py                  # ReplaySession — model-driven step reconstruction
+│   ├── stage_gate.py              # StageGate — blocks synthesis until C ≥ threshold
+│   ├── similarity.py              # Sim() functions: token Jaccard, LCS, AST, composite
+│   ├── objective_calibration.py   # Objective quality gate for SOTA+x candidates
+│   └── analysis/
+│       └── threshold_search.py    # Calibration threshold analysis tooling
+│
 ├── 📂 agents/
-│   ├── literature/             # Agentic RAG — Deep Literature Synthesis
-│   └── empirical/              # Coding agents — Micro-Experiments
+│   ├── literature/                # Agentic RAG — Deep Literature Synthesis
+│   ├── empirical/                 # Coding agents — Micro-Experiments
+│   └── run_arl.py                 # etft-arl CLI — Agentic Research Loop entry point
+│
 ├── 📂 analysis/
-│   └── pareto_delta/           # Retrospective 80/20 Δ Analysis
+│   └── pareto_delta/              # Retrospective 80/20 Δ Analysis
+│
 ├── 📂 synthesis/
-│   └── sota_plus_one/          # Augmented SOTA+x Generation, Triage & Recursive Loop
-└── 📂 feedback/
-    └── rl_loop/                # In-Context RL & Organic Negative Data
+│   ├── sota_plus_one/             # Augmented SOTA+x Generation & Triage
+│   ├── lora_routing/              # Dynamic LoRA Routing (inference-time orchestration)
+│   └── recursive_loop.py          # Recursive SOTA+x discovery orchestrator
+│
+├── 📂 feedback/
+│   └── rl_loop/                   # In-Context RL & Organic Negative Data
+│
+└── 📂 docker/
+    ├── agent/                     # Coding-agent proxy container (FastAPI server)
+    ├── docker-compose.yml
+    └── seccomp-etft.json          # Seccomp security profile for sandboxed execution
 ```
 
 ---
@@ -360,31 +402,56 @@ cd AutoScientist-ETFT
 pip install -r requirements.txt
 ```
 
+The project also ships a `pyproject.toml` with optional dependency groups for a lighter install:
+
+```bash
+# Core only (no GPU/fine-tuning deps)
+pip install -e .
+
+# With fine-tuning support (PEFT/LoRA)
+pip install -e ".[finetune]"
+
+# With persistent RAG vector store (ChromaDB)
+pip install -e ".[rag]"
+
+# With Kubernetes cluster submission
+pip install -e ".[cluster]"
+
+# Full install (all extras)
+pip install -e ".[finetune,rag,cluster,viz]"
+```
+
 ### Quick Start
 
 ```bash
 # Step 1: Generate the regression corpus for a target algorithm family
 python corpus/regression_pipeline/run.py --target <algorithm_family>
 
-# Step 2: Fine-tune your LLM on the generated trajectories
+# Step 2: Run the Retrospective 80/20 Δ Analysis to identify bottlenecks
+python analysis/pareto_delta/run.py --trajectory <trajectory_id>
+
+# Step 3: Fine-tune your LLM on the generated trajectories
 python train.py --dataset corpus/ --model <your-base-model>
 
-# Step 3: Run the Calibration Engine (Evolutionary Replay stage-gate)
+# Step 4: Run the Calibration Engine (Evolutionary Replay stage-gate)
 python pipeline.py --target <algorithm_family> --seed-code sota.py --stage calibrate
 
-# Step 4: Launch the Agentic Research Loop
+# Step 5: Launch the Agentic Research Loop
 python agents/run_arl.py --bottleneck <identified_component>
 
-# Step 5: Generate and evaluate a SOTA+1 candidate
+# Step 6: Generate and evaluate a SOTA+1 candidate
 python synthesis/sota_plus_one/generate.py --trajectory <trajectory_id>
 
-# Step 6 (optional): Recursive SOTA+x discovery (SOTA+1 → SOTA+2 → SOTA+3)
+# Step 7 (optional): Recursive SOTA+x discovery (SOTA+1 → SOTA+2 → SOTA+3)
 python synthesis/sota_plus_one/generate.py \
     --trajectory <trajectory_id> \
     --recursive --generations 3
 
-# Run the full pipeline (all stages including calibration)
+# Run the full pipeline (all 8 stages including calibration)
 python pipeline.py --target <algorithm_family> --seed-code sota.py
+
+# View run summaries
+etft-report
 ```
 
 ---
@@ -397,6 +464,8 @@ All papers are located in the [`papers/`](papers/) directory.
 |---|---|
 | [**Evolutionary Trajectory Fine-Tuning**](papers/ETFT.pdf) | The foundational paper introducing ETFT. Proposes training LLMs on ordered sequences of improving algorithms to teach the *direction* of progress. Introduces the Open-Loop Empirical Architecture, 80/20 Δ Analysis, and the Probabilistic Heuristic Filter. *(Benda, April 2026)* |
 | [**Recursive Stage-Gate Calibration**](papers/Recursive%20Stage-Gate%20Calibratio.pdf) | Introduces the **Calibration Engine** and the Evolutionary Replay protocol. Establishes a hard algorithmic stage-gate (Confidence Level C) that grounds SOTA+x synthesis in verifiable computer science principles. Also introduces Recursive SOTA+x Discovery — multi-generational autonomous innovation by extending the fossil record. *(Benda, April 2026)* |
+| [**ETFT Orthogonal Calibration Strategy**](papers/ETFT%20Orthogonal%20Calibration%20Strategy.pdf) | Introduces the Width/Depth orthogonal training split and the Objective Calibration quality gate. Separates trajectory depth learning (evolutionary history) from width learning (lateral variants), preventing overfitting and improving generalisation. *(Benda, April 2026)* |
+| [**Inference-Time Orchestration**](papers/Imference-time%20Orchestration.pdf) | Describes the Dynamic LoRA Routing system — a three-phase inference architecture that hot-swaps generational Width LoRA adapters at synthesis time. *(Benda, April 2026)* |
 | [**The Meta-Evolutionary Epoch**](papers/The%20Meta-Evolutionary%20Epoch.pdf) | A visionary capstone extending ETFT beyond individual algorithms to higher-order Scientific Blueprints and societal paradigms. Argues that the same evolutionary trajectory methodology can accelerate epochal shifts across entire technological and organisational domains. *(Benda, April 2026)* |
 | [**GPU-Poor ETFT Proof of Concept**](papers/PoC-ETFT-GPU-Poor.pdf) | A concrete PoC validating ETFT on a TinyML time-series anomaly-detection benchmark for microcontrollers. Demonstrates autonomous SOTA+1 discovery using only cloud reasoning APIs and a consumer GPU, decoupling hypothesis synthesis from physical evaluation. *(Benda, April 2026)* |
 | [**Peer Review Report**](papers/Concept_LLM.pdf) | Official peer review of the ETFT paper — verdict: *Strong Accept (Recommended for Oral Presentation/Spotlight)*. Provides a detailed critical analysis of the dataset generation architecture, the agentic research loop, and the broader implications of the General Innovation Accelerator vision. *(April 2026)* |
