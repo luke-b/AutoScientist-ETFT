@@ -21,6 +21,8 @@
 
 ## 📖 Overview
 
+ETFT treats technological progress itself as supervised data: ordered, causally annotated transitions between historically successive solutions are used to learn reusable innovation operators. Unlike evolutionary search systems that learn solely from online mutations, ETFT requires evolutionary replay of known historical transitions as an epistemic calibration test before permitting extrapolation beyond the known frontier. Empirically validated discoveries then extend the trajectory on which subsequent generations are recalibrated.
+
 **AutoScientist-ETFT** is a pioneering machine learning framework that transforms Large Language Models (LLMs) from *static code generators* into **autonomous research scientists**. Rather than training on disconnected code fragments, ETFT leverages precisely AI-assisted regressions of State-of-the-Art (SOTA) algorithms to teach LLMs the fundamental vectors of architectural innovation.
 
 This repository implements the full **Open-Loop Empirical Architecture** described in the paper *"Evolutionary Trajectory Fine-Tuning: Reverse-Engineering Algorithmic Progression"* (Benda, 2026). It addresses the critical limitation of parametric memory—the *"knowledge blindspot"*—by deploying autonomous research agents that continuously retrieve up-to-date scientific literature, run empirical micro-experiments, and recycle failures as organic negative feedback.
