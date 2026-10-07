@@ -19,6 +19,26 @@
 
 ---
 
+## 🧪 Start Here: Falsifiable Historical Replay Pilot
+
+**Status:** ETFT is a research hypothesis and implementation prototype. The Historical Replay benchmark is being prepared; **no claim of demonstrated SOTA acceleration is made yet**.
+
+**Minimum testable hypothesis:**
+
+> Does an ordered, causally annotated history of improvements reduce the search effort required to reconstruct a withheld historical innovation?
+
+**Matched comparison:** `unordered evidence` → `ordered trajectory` → `ordered trajectory + causal Δ metadata (ETFT)`
+
+**Primary metric:** **evaluations-to-threshold** under a fixed model, evaluator, candidate budget, token budget, and compute budget.
+
+➡️ **[Read the frozen pilot protocol](EXPERIMENT.md)**  
+➡️ **[Inspect the trajectory record schema](data/historical_replay.schema.json)**  
+➡️ **[Historical Replay example scaffold](examples/historical_replay/README.md)**
+
+The first candidate domain is a public SAT-solver lineage because it provides executable artifacts, objective correctness/runtime evaluation, and a relatively low-cost CPU benchmark.
+
+---
+
 ## 📖 Overview
 
 ETFT treats technological progress itself as supervised data: ordered, causally annotated transitions between historically successive solutions are used to learn reusable innovation operators. Unlike evolutionary search systems that learn solely from online mutations, ETFT requires evolutionary replay of known historical transitions as an epistemic calibration test before permitting extrapolation beyond the known frontier. Empirically validated discoveries then extend the trajectory on which subsequent generations are recalibrated.
