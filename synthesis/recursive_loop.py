@@ -394,7 +394,6 @@ class RecursiveSOTAGenerator:
         and invokes ``train.train()`` in Width mode.  On completion the
         adapter is registered in ``self._library``.
         """
-        import tempfile
 
         oc_cfg = self._cfg.get("orthogonal_calibration", {})
         width_cfg = oc_cfg.get("width", {})

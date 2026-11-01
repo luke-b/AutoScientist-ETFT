@@ -5,14 +5,12 @@ with mocked adapters, sandbox, and DynamicLoRARouter.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from synthesis.lora_routing.adapter_library import AdapterLibrary
 from synthesis.recursive_loop import RecursiveResult, RecursiveSOTAGenerator
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

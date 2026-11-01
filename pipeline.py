@@ -452,7 +452,6 @@ def _run_orthogonal_train_stage(
     Returns a summary dict with adapter paths and dataset statistics.
     """
     from corpus.orthogonal.width_dataset_builder import WidthDatasetBuilder
-    from corpus.regression_pipeline.schemas import TrajectoryStep
     from synthesis.lora_routing.adapter_library import AdapterLibrary
     from train import train as _train
 

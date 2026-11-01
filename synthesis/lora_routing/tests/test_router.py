@@ -6,9 +6,7 @@ DynamicLoRARouter with mocked LoRA hot-swap and mocked LLM.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -22,7 +20,6 @@ from synthesis.lora_routing.router import (
     _format_papers,
     _parse_depth_analysis,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -121,7 +118,7 @@ def test_router_route_no_adapter(lib, tmp_path):
     router = DynamicLoRARouter(cfg={}, adapter_library=lib_no_gen)
 
     with (
-        patch.object(router._llm, "complete", return_value=_DEPTH_RESPONSE) as mock_depth,
+        patch.object(router._llm, "complete", return_value=_DEPTH_RESPONSE),
         patch(
             "agents.literature.searcher.LiteratureSearcher.search", return_value=[]
         ),

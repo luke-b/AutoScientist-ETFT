@@ -264,7 +264,7 @@ def test_pipeline_orthogonal_train_with_corpus(tmp_path):
     """
     orthogonal_train stage discovers trajectory steps from the corpus stage.
     """
-    from pipeline import _load_state, _save_state, run_pipeline
+    from pipeline import run_pipeline
 
     predecessor_response = _make_llm_response(f"```python\n{_SIMPLE_ALGO}```")
 
