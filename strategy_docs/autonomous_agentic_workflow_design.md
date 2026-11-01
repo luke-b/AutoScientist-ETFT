@@ -1,0 +1,161 @@
+# Autonomní vývojový hodnotový tok v prostředí GitHub Agentic Workflows
+
+## 1. Úvod do autonomního vývojového hodnotového toku
+Současný vývoj softwarových systémů prochází paradigmatickou změnou. Tradiční asistenční modely umělé inteligence, které inženýrům pomáhají s doplňováním kódu přímo ve vývojovém prostředí (IDE) formou reaktivních nápověd, jsou postupně nahrazovány proaktivními a plně autonomními agentními systémy. Tento výzkumný dokument představuje vyčerpávající analýzu a detailní implementační rámec pro vytvoření uceleného autonomního vývojového toku (end-to-end dev pipeline) v nativním prostředí platformy GitHub. Záměrem je materializovat systém, v němž je počáteční lidský „nápad nebo požadavek“ reprezentovaný jako standardní GitHub Issue zachycen, interpretován a následně zpracován kaskádou specializovaných agentů umělé inteligence bez nutnosti kontinuálního lidského mikromanagementu.
+
+Ústředním bodem tohoto inovativního návrhu je role prvotního agenta (Business Analyst Agent), který příchozí požadavek sémanticky analyzuje, navrhne tři technicko-byznysové cesty řešení a po interakci s uživatelem zformuluje komplexní analytický dokument. Následné automatizované úlohy v rámci systému striktně kopírují zralý hodnotový tok (value stream) moderní agilní organizace pro vývoj produktů. Zahrnují architektonický návrh, samotnou implementaci kódu, automatizované testování a finální revizi (Code Review).
+
+Aby byl takto komplexní systém robustní, předvídatelný a odolný vůči halucinacím či postupné degradaci kvality výstupů velkých jazykových modelů (LLM), je celý procesní tok podřízen principům managementu kvality, které definoval W. E. Deming, a pokročilým mechanismům statistické kontroly procesů (Statistical Process Control – SPC). Systém je zároveň navržen s plným vědomím technických možností a infrastrukturních limitů rozhraní GitHub, včetně využití dedikovaných inference endpoints pro předplatné Pro, řešení omezení rychlosti požadavků (rate limits) a optimalizace kontextových oken AI modelů.
+
+## 2. Architektura a orchestrace agentů jako stavový automat
+Základním architektonickým vzorem pro orchestraci autonomních agentů v tomto rámci je využití samotného Git repozitáře a jeho kolaborativního ekosystému (zejména GitHub Issues a Pull Requests) jako centralizovaného stavového automatu (state machine) a asynchronní komunikační sběrnice.
+
+### 2.1 Řízení stavu pomocí repozitáře a událostí
+V komplexním multi-agentním systému je nezbytné udržovat jediný zdroj pravdy (single source of truth), který zabraňuje desynchronizaci sdíleného kontextu. V navrhovaném rámci slouží repozitář zdrojového kódu k uložení finálního, trvalého stavu, zatímco GitHub Issues reprezentují přechodné stavy, diskusní vlákna a strukturovaná metadata probíhajících úloh. Namísto implementace složitých externích databází či orchestrátorů třetích stran se agenti orientují výhradně podle událostí (events) přímo na platformě GitHub.
+
+Každý specializovaný agent je spouštěn na základě specifických událostí definovaných v konfiguraci workflow pomocí klíče on. Systém využívá granularitu událostí k přesnému zacílení aktivity. Například událost issues s typy opened nebo labeled umožňuje aktivovat analytického agenta ve chvíli, kdy je nové zadání označeno štítkem identifikujícím nový nápad. Změna stavu Issue, jako je přidání specifického komentáře, modifikace těla požadavku nebo změna štítku, tak slouží jako formální spouštěč (trigger) pro bezproblémové předání řízení dalšímu agentovi v hodnotovém toku.
+
+### 2.2 Konfigurace agentů prostřednictvím YAML Frontmatter a gh-aw CLI
+Deklarativní definice agentů je v moderním pojetí GitHub Agentic Workflows realizována prostřednictvím standardizovaných souborů Markdown (.md), které ve své hlavičce obsahují takzvaný YAML Frontmatter. Tento přístup odděluje chování agenta od imperativního kódu a umožňuje ukládat konfiguraci (nástroje, modely a oprávnění) společně se zdrojovým kódem, což usnadňuje verzování, audity a případné vracení změn (rollbacks).
+
+Typická konfigurace agenta pro byznys analýzu obsahuje několik klíčových sekcí. Klíč intent srozumitelně definuje trvalý cíl workflow, zatímco description poskytuje lidsky čitelný popis. Zásadní je deklarace nástrojů (tools) a importovaných schémat pomocí import-schema, jež agentovi propůjčují schopnost interakce se systémem.
+
+Je nezbytné zmínit, že samotný .md soubor přímo nevykonává kód; k jeho převodu se využívá proprietární rozšíření příkazové řádky gh-aw (GitHub Agentic Workflows). Vývojář spustí příkaz gh aw compile, který zvaliduje YAML Frontmatter a převede strukturu do standardního produkčního souboru .lock.yml, jejž posléze čte infrastruktura GitHub Actions. Bezpečnost je zajištěna tím, že vygenerované procesy běží izolovaně v Cloud Hypervisor nebo NVX micro-VM sandboxing kontejnerech (jako tzv. Agent Workflow Firewall) ve výchozím nastavení "read-only", přičemž jakékoliv modifikace dat procházejí dedikovanou fází "safe outputs" k zamezení exfiltrace dat a bezpečnostních hrozeb.
+
+V kontextu orchestrace celého řetězce se využívají pokročilé direktivy pro řízení souběžnosti. Například direktiva lock-for-agent: true je zcela kritická pro zachování integrity dat; zajišťuje, že konkrétní Issue je během zpracování agentem uzamčeno, čímž se efektivně předchází jevům souběhu (race conditions), kdy by se dva různí agenti pokoušeli ve stejném zlomku sekundy modifikovat tentýž požadavek.
+
+Řízení souběhu (concurrency) je na úrovni definice workflow dále posíleno parametry group a cancel-in-progress: true. Tyto parametry definují, že pokud uživatel rychle změní zadání v Issue, předchozí běžící instance agenta je okamžitě ukončena. Tím systém zabraňuje zbytečnému plýtvání cennými výpočetními minutami GitHub Actions a drahými tokeny velkých jazykových modelů. Dalším významným prvkem je max-stack: 1, který omezuje spouštění workflow na nejvyšší vrstvu skládaných Pull Requestů (stacked PRs), čímž se razantně snižují náklady na redundantní běhy kontinuální integrace (CI).
+
+### 2.3 Eliminace zacyklení a překonání limitů GITHUB_TOKEN
+Při budování kaskádových agentních systémů v GitHub Actions naráží inženýři na fundamentální architektonický problém: prevenci nekonečných smyček (event loops). GitHub standardně implementuje tvrdou bezpečnostní pojistku na úrovni infrastruktury. Pokud je jakákoliv akce (například vytvoření komentáře, úprava Issue nebo otevření Pull Requestu) provedena s využitím vestavěného a automaticky injektovaného tokenu GITHUB_TOKEN, tato akce absolutně nespustí žádný další navazující workflow, i když by daná událost normálně odpovídala podmínkám on: v jiném souboru.
+
+Tato zabudovaná pojistka sice chrání platformu před zacyklením, avšak v kontextu autonomního hodnotového toku přímo paralyzuje schopnost agentů plynule si předávat úkoly. K překonání tohoto závažného omezení existují v zásadě tři cesty, z nichž pouze jedna je vhodná pro produkční firemní nasazení:
+
+| Autentizační mechanismus | Charakteristika a bezpečnostní profil | Dopad na autonomní řetězení agentů |
+| :--- | :--- | :--- |
+| GITHUB_TOKEN | Vestavěná bezpečnost, automatická rotace po dokončení jobu, omezený rozsah striktně na konkrétní repozitář. | Zcela znemožňuje autonomní řetězení. Agent A nemůže svým výstupem (např. komentářem) probudit Agenta B. |
+| Personal Access Token (PAT) | Trvalý token spojený s konkrétním uživatelem (často dedikovaným bot účtem). Umožňuje spouštět navazující workflow. | Zásadně porušuje princip nejmenšího oprávnění (Principle of Least Privilege). Pokud dojde k úniku, útočník získává přístup ke všem repozitářům daného uživatele. Nutná manuální rotace. |
+| GitHub App (Instalační Token) | Autonomní identita, granulární oprávnění definovaná při vytvoření aplikace, krátká životnost tokenu (typicky 1 hodina). | Ideální řešení. Generuje platné události, které spouští další agenty. Krátká platnost minimalizuje riziko kompromitace při úniku. |
+
+V navrhovaném implementačním rámci se systém spoléhá výhradně na využití GitHub App. Architektura autentizace funguje na bázi dvou tokenů. Nejprve je pomocí soukromého klíče aplikace (.pem) a jejího ID vygenerován JSON Web Token (JWT). Tento JWT má platnost maximálně 10 minut a slouží výhradně k autentizaci vůči GitHub API za účelem vyžádání takzvaného instalačního přístupového tokenu (Installation Access Token). Instalační token, platný obvykle jednu hodinu, je následně předán workflow běžícímu v GitHub Actions a využíván agenty pro modifikaci stavu repozitáře a Issues. Aplikaci jsou přidělena přísně omezená práva, specificky issues: write, pull_requests: write a contents: write, čímž se udržuje nejvyšší možný bezpečnostní standard a zabraňuje se neoprávněné manipulaci napříč repozitáři.
+
+## 3. Autonomní agilní hodnotový tok (End-to-End Pipeline)
+Jakmile je vyřešena infrastrukturní a autentizační vrstva, hodnotový tok může začít. Celý cyklus je iniciován v okamžiku, kdy lidský uživatel (Product Owner, analytik nebo stakeholder) založí nové GitHub Issue a označí jej štítkem (např. type: idea). Systém následně replikuje chování moderní agilní organizace. Každá fáze má jasně definované vstupy a výstupy, přičemž nedochází k posunu do další fáze, pokud nejsou splněna přísná kritéria kvality.
+
+### 3.1 Fáze 1: Incepce a byznys analýza (Business Analyst Agent)
+Prvním článkem autonomního řetězce je specializovaný agent v roli byznys analytika (BA). Lidské zadání je často nečitelné, vágní, plné implicitních předpokladů nebo z technického hlediska neúplné. Úkolem BA Agenta je tento surový vstup zachytit a transformovat jej do podoby, se kterou může exaktně pracovat technický systém.
+
+Jakmile je Issue vytvořeno a zachyceno webhookem spojeným s GitHub App, BA Agent zahájí sémantickou analýzu textu. K tomu, aby pochopil, jak nový požadavek zapadá do stávajícího systému, potřebuje kontext repozitáře. Namísto naivního vkládání celého kódu do svého promptu využívá vektorové vyhledávání nebo protokoly typu Model Context Protocol (MCP) k selektivnímu čtení relevantní dokumentace a architektury. Na základě těchto informací zformuluje tři odlišné cesty implementace, z nichž každá reprezentuje jiný poměr mezi rychlostí dodání, technickým dluhem a architektonickou čistotou:
+
+* Rychlé vítězství (Quick Win): Minimální invazivní zásah do existující kódové základny. Využívá stávajících komponent a nevyžaduje změny databázového schématu. Zajišťuje nejrychlejší nasazení (Time-to-Market), avšak může omezovat budoucí škálovatelnost.
+* Standardní iterace (Standard Feature): Vyvážený agilní přístup odpovídající současné architektuře. Představuje optimální kompromis mezi úsilím a dlouhodobou udržitelností.
+* Architektonická přestavba (Architectural Overhaul): Komplexní řešení, které do budoucna eliminuje vznikající technický dluh, ale vyžaduje značnou refaktorizaci, úpravy API a alokaci většího množství zdrojů.
+
+BA Agent tyto tři možnosti syntetizuje a prezentuje je jako komentář v původním Issue. Pro zajištění interaktivity může využít pokročilé formátování nebo markdownové zaškrtávací seznamy (task lists), kde uživatel explicitně vybere jednu z cest. Jakmile uživatel provede volbu, agent vytvoří finální dokument byznys analýzy (Business Analysis Document). Tento dokument nesmí být nestrukturovaným textem. V rámci navrhované architektury je tento výstup reprezentován jako validovaný JSON nebo striktně formátovaný Markdown, jehož sémantická struktura je na úrovni běhového prostředí kontrolována pomocí Pydantic schémat (viz kapitola 4). Tento dokument se stává neměnným zadáním pro zbytek toku.
+
+### 3.2 Fáze 2: Návrh systému a architektury (System Architect Agent)
+Po schválení BA dokumentu a změně stavu Issue se aktivuje System Architect Agent. Tento agent přijímá strukturovaný výstup od BA Agenta jako svůj primární vstupní kontext. Jeho posláním je překlenout propast mezi byznysovými požadavky a exaktními technickými specifikacemi.
+
+System Architect Agent analyzuje existující kód s využitím specifických GitHub GraphQL dotazů nebo pokročilých RAG (Retrieval-Augmented Generation) technik. Jeho výstupem je formální záznam o architektonickém rozhodnutí (Architecture Decision Record - ADR). Tento záznam obsahuje popis navrhovaných datových struktur, definici rozhraní (API smluv) a seznam softwarových závislostí. Důležitým vedlejším produktem činnosti tohoto agenta je rozpad hlavního požadavku na sadu drobných, plně nezávislých technických úloh (Tasks), jež jsou zapsány zpět do GitHubu jako podružná Issues s vazbou na to původní. Tím vzniká hierarchická struktura práce, která je okamžitě připravena pro exekuci.
+
+### 3.3 Fáze 3: Implementace a kódování (Developer Agent)
+Na úrovni jednotlivých technických úloh operuje Developer Agent. Pro každou úlohu je automaticky vytvořena nová pracovní větev (branch) vycházející z hlavní větve repozitáře, čímž agent dodržuje metodiku trunk-based development nebo GitHub Flow.
+
+Developer Agent je vybaven sadou nástrojů (tools) definovaných v YAML Frontmatter konfiguraci. Tyto nástroje mu umožňují vykonávat unixové příkazy (bash), číst strukturu adresářů (list), vyhledávat v souborech (grep) a modifikovat kód (edit, write). Kritickým bezpečnostním prvkem této fáze je prevence halucinací (vymýšlení si neexistujících funkcí či knihoven). Systémový prompt a konfigurační obálka agenta zavádí pravidlo striktního selhání: pokud vývojový agent narazí na rozporuplné informace nebo mu chybí oprávnění k přístupu k důležitému modulu, nesmí se pokoušet řešení odhadnout. Místo toho musí vyvolat proces Request for Information (RFI), pozastavit svou činnost a upozornit lidského operátora nebo zpětně architekta. Tím je zajištěno, že se defekty odhalují v rané fázi procesu (shift-left testing).
+
+### 3.4 Fáze 4: Automatizované testování (QA/Test Agent)
+Jakmile Developer Agent dokončí svou práci a vytvoří prvotní modifikace, na scénu vstupuje Quality Assurance (QA) Agent. Tento agent neprovádí pouze mechanické spuštění stávajících CI testů; jeho role je mnohem proaktivnější. QA Agent autonomně analyzuje diference (diffs) vytvořené v pracovní větvi a na základě pochopení byznys kontextu z Fáze 1 navrhuje a implementuje zcela nové sady jednotkových (unit) a integračních testů.
+
+V této fázi se masivně využívá koncept delegování agentů (Agent Delegation) prostřednictvím architektury SubAgents. QA Agent funguje jako orchestrátor a může si pro specifické úkoly vyvolat specializované sub-agenty. Například může předat část kódu agentovi specializovanému na statickou analýzu bezpečnosti, zatímco jiný sub-agent ověřuje výkonnostní dopady (Big O analýza). Každá tato sub-delegace probíhá ve vlastním izolovaném vlákně, čímž se předchází kontaminaci kontextového okna a snižuje se riziko zmatení hlavního QA Agenta. Výsledkem této fáze je kód, který nejen splňuje funkční požadavky, ale disponuje odpovídajícím testovacím pokrytím.
+
+### 3.5 Fáze 5: Code Review a integrace (Reviewer Agent)
+Závěrečnou fází před samotným sloučením kódu do produkční větve je komplexní revize. Reviewer Agent je spuštěn automaticky událostí vzniku nebo aktualizace Pull Requestu (on: pull_request: types: [opened, synchronize]). Tento agent zastává roli seniorního vývojáře. Posuzuje předložený kód z hlediska dodržování interních stylových standardů organizace, bezpečnosti a – což je nejdůležitější – sémantického souladu s původním dokumentem byznys analýzy (zajišťuje end-to-end zpětnou sledovatelnost).
+
+Pokud kód nesplňuje stanovené metriky, Reviewer Agent vloží do Pull Requestu konkrétní komentáře s požadavky na úpravy, čímž donutí Developer Agenta provést iterativní opravy. Aby se předešlo zacyklení a plýtvání zdroji, uplatňuje se i zde politika max-stack: 1, díky níž agent ignoruje průběžné podružné revize a soustředí se pouze na finální sjednocený kód určený k nasazení.
+
+## 4. Řešení problému předávání dat (The Handover Problem) a strukturované kontrakty
+Úspěch popsaného hodnotového toku závisí téměř výhradně na schopnosti jednoho agenta předat relevantní a nezkreslený kontext agentovi navazujícímu. Klasický JSON mód, kterým dnes disponuje většina modelů, tento takzvaný handover problem plně neřeší.
+
+### 4.1 Zklamání z prostého JSON módu a role Pydantic AI
+Když BA Agent předává výstup Architektovi pouze ve formě volného textu nebo slabě typovaného JSONu, dochází ke ztrátě sémantické věrnosti. Běžné jazykové modely trpí fundamentálním problémem: nedokážou spolehlivě detekovat vlastní nevědomost v případě, že jim kontext chybí od samého začátku. Model vygeneruje sebevědomou odpověď, která syntakticky vypadá správně, ale reálně v ní chybí například klíčové bezpečnostní výjimky definované na počátku.
+
+Z tohoto důvodu celý navržený rámec integruje knihovnu Pydantic AI. Pydantic převádí Python třídy na striktní JSON schémata a zajišťuje typovou bezpečnost od začátku do konce. Každá hranice mezi agenty je v systému modelována jako exaktní Pydantic kontrakt.
+
+Pokud agent vygeneruje datovou strukturu, která neodpovídá požadovanému schématu (např. chybí povinný atribut, nebo je hodnota typu string místo boolean), Pydantic AI nevyvolá okamžité selhání celého procesu. Místo toho zachytí výjimku (Validation Error), zformuluje chybovou zprávu a vrátí ji modelu zpět v tomtéž kontextovém okně. Model tak dostává okamžitou zpětnou vazbu a šanci chybu opravit ještě předtím, než poškozená data vůbec opustí běhové prostředí agenta a kontaminují repozitář.
+
+### 4.2 Sémantická úplnost a metadata provenience
+Striktní Pydantic validace ověřuje pouze to, že jsou přítomna pole požadovaná schématem a že obsahují správné datové typy. Nemůže ovšem ověřit, zda data, která měla být vložena, skutečně vložena byla. Pokud model vygeneruje validní, avšak sémanticky vyprázdněné tří-slovné shrnutí dlouhého zadání, Pydantic schéma typu context: str toto shrnutí bez varování propustí.
+
+K vyřešení této slepé skvrny rozšiřuje navrhovaný framework Pydantic modely o vrstvu provenience dat. Každý předávaný objekt (například výstup z RAG vyhledávání) musí kromě samotného textu obsahovat metadata: ze kterého zdrojového souboru byla data získána, v jaké verzi, jaký byl identifikátor revize a zda bylo kontextové vyhledávání vyčerpávající nebo muselo být zkráceno z důvodu dosažení tokenových limitů. Tato transparentní provenience převádí skrytou ztrátu informací na explicitní strukturovaný atribut, který následný agent může algoritmicky zkontrolovat. Pokud Navazující agent detekuje neúplnou provenienci, může úlohu odmítnout.
+
+### 4.3 Trvanlivé provádění (Durable Execution) a Observabilita
+Produkční agentní procesy často trvají minuty až hodiny, zejména pokud vyžadují interakci s asynchronními systémy. Běh v prostředí GitHub Actions nesmí zablokovat CI runner na neúměrně dlouhou dobu. Pydantic AI nativně podporuje integraci s nástroji pro trvanlivé provádění (Durable Execution), konkrétně prostřednictvím end-to-end enginu Temporal.
+
+Nasazením komponenty TemporalDurability (např. z modulu pydantic_ai.durable_exec.temporal) je každý krok agenta (včetně volání nástrojů a sub-agentů) exaktně zaznamenán jako trvalá událost (event history). Pokud dojde k výpadku sítě, selhání serveru, vyčerpání limitů GitHub runneru nebo čekání na lidský zásah (human-in-the-loop), proces je bezpečně uspán a po restartu pokračuje přesně tam, kde skončil. Vše si pamatuje bez opětovného spotřebovávání tokenů, aniž by ztratil kontext předchozí konverzace.
+
+Pro sledování výkonu, latence a finančních nákladů (cost monitoring) je systém doplněn o Pydantic Logfire. Tato platforma založená na standardu OpenTelemetry poskytuje inženýrům vizualizaci celého stromu událostí, od spuštění GitHub eventu až po detailní trasování (tracing) toho, jak se model rozhodoval při výběru specifického Pydantic sub-schématu. Tím se z černé skříňky (black box) LLM stává auditovatelný inženýrský proces.
+
+## 5. Principy kvality W. E. Deminga a Statistická kontrola procesů (SPC)
+Nasazení LLM agentů, kteří jsou z podstaty nedeterminističtí a probabilističtí, do kritických fází vývoje softwaru narušuje předvídatelnost tradičních agilních metodik. Tradiční agilní přístupy předpokládají, že lidský programátor vytváří deterministický kód, na který lze aplikovat binární sady testů (prošel/neprošel). U AI agentů je variabilita výstupů inherentní. Proto je nutné integrovat pokročilé postupy řízení kvality, specificky 14 bodů managementu W. E. Deminga v kombinaci se Statistickou kontrolou procesů (SPC).
+
+### 5.1 Aplikace Demingových principů na AI systémy
+Demingova filozofie se zaměřuje na odstranění chyb přímo ve výrobním procesu namísto jejich zpětného hledání. Tři konkrétní body z jeho učení formují základ tohoto autonomního toku:
+* Zastavit závislost na masové kontrole (Bod 3): Klasické softwarové inženýrství spoléhá na to, že chyby se chytí během manuálního Code Review. Deming tvrdí, že inspekce na konci linky kvalitu nezlepšuje, pouze nachází zmetky. Aplikováno na agentní pipeline to znamená, že systém nesmí generovat rozsáhlé textové výstupy s nadějí, že je validuje QA agent na konci. Místo toho je kvalita "zabudována" použitím strukturovaných dat (Pydantic), které validují každý mikrokrok agenta v reálném čase.
+* Neustále vylepšovat systém výroby a služeb (Bod 5): Modely podléhají neustálému vývoji, jemným změnám vah a driftu na straně poskytovatele (OpenAI, Anthropic). Není možné nasadit systém a předpokládat, že jeho chování zůstane stabilní. Je nutné kontinuálně monitorovat klíčové metriky, jako je chybovost schémat (schema pass rate) nebo míra odmítnutí úkolu (refusal rate), a proaktivně optimalizovat systémové prompty.
+* Odstranit strach (Bod 8): V kontextu AI to znamená nastavit systémové mantinely (guardrails) tak, aby LLM nebyl "nucen" hádat odpovědi kvůli obavě z nesplnění úkolu. Agent musí mít bezpečnou cestu pro eskalaci problému (např. označení Issue štítkem vyžadujícím lidskou pomoc), aniž by to systém vyhodnotil jako fatální selhání celého procesu.
+
+### 5.2 Implementace SPC: Regulační diagramy pro LLM
+K implementaci Demingova pátého bodu (neustálé vylepšování a sledování variability) využívá rámec regulační diagramy (Control Charts). Tyto nástroje vizuálně odlišují běžnou, inherentní variabilitu procesu (šum vyvolaný teplotou LLM) od variabilit způsobených speciálními příčinami (např. skrytá degradace API poskytovatele).
+
+Nasazení SPC na výstupy LLM vyžaduje volbu správných statistických distribucí. Tradiční hodnocení LLM jako pouhého propustného filtru (pre-deployment gate) je nedostatečné. Metriky musí být vyhodnocovány průběžně na reálném provozu.
+
+**P-diagram (p-chart) pro míru průchodnosti schémat**
+Nejdůležitějším nástrojem pro monitorování zdraví agentů je p-diagram. Tento atributový regulační diagram striktně využívá binomické rozdělení pravděpodobnosti a zaznamenává data typu "prošel/neprošel" – konkrétně sleduje celkový podíl (proportion) vadných jednotek ve vzorcích. V kontextu Pydantic AI je "vadnou jednotkou" jakýkoliv pokus LLM o návrat JSONu, který selže na syntaktické nebo typové validaci.
+
+Rozhodnutí použít p-diagram namísto alternativního np-diagramu (který počítá čistý počet defektů) je v tomto doménovém kontextu kritické. Np-diagram totiž předpokládá, že velikost vzorku je vždy naprosto konstantní. To je u autonomního vývojového týmu nereálné – ve středu mohou agenti zpracovat 500 úloh (issues), zatímco v neděli pouze 20.
+
+P-diagram elegantně zvládá variabilní velikost vzorků, protože se přizpůsobí kontrolní meze aktuálnímu provozu. Vzhledem k odlišným vzorkům tak vizuálně vznikají na diagramu tzv. "zakřivené linky" (curved lines) místo rovných horizontál. Výpočet střední osy (Center Line, $\bar{p}$) představuje historický celkový počet defektních JSONů dělený celkovým počtem generování. Horní (UCL) a dolní (LCL) kontrolní meze pro konkrétní den nebo hodinu (kde $n_i$ je počet požadavků v tomto intervalu) se vypočítají takto:
+
+$$UCL = \bar{p} + 3 \times \sqrt{\frac{\bar{p}(1-\bar{p})}{n_i}}$$
+$$LCL = \bar{p} - 3 \times \sqrt{\frac{\bar{p}(1-\bar{p})}{n_i}}$$
+
+Díky přítomnosti $n_i$ ve jmenovateli se při nízkém provozu o víkendu kontrolní meze přirozeně rozšíří (tolerance k šumu je vyšší u malého vzorku), zatímco při vysokém provozu se zúží. Pokud podíl selhání schémat překročí UCL, SPC systém generuje okamžitý incident, neboť se prokazatelně změnily schopnosti základního modelu (Foundation Model) sledovat strukturu.
+
+**C-diagram a U-diagram pro hustotu softwarových defektů**
+Zatímco p-diagram hodnotí dokument jako celek ("splňuje / nesplňuje schéma"), kód generovaný Developer Agentem může v jednom souboru obsahovat více izolovaných chyb (např. nesprávné indentace, nepoužité importy zjištěné linterem). Zde binomická klasifikace selhává, jelikož jeden díl může obsahovat více než jeden defekt. Na řadu tak přichází Poissonovo rozdělení reprezentované c-diagramy a u-diagramy.
+
+* C-diagram: Použije se striktně v případě, že vyhodnocovaná oblast nebo jednotka (například modul o stejné velikosti) nabízí vždy konstantní "prostor příležitostí k chybě". Sleduje tak absolutní počet chyb.
+* U-diagram: V reálném vývoji jsou ale vytvořené Pull Requesty různě rozsáhlé (jeden má 10 řádků, jiný 500 řádků) a nekonzistentní. U-diagram proto sleduje počet defektů na jednotku plochy nebo objemu (například průměrný počet chyb na 100 řádků kódu – defect density). Stejně jako p-diagram flexibilně přizpůsobuje toleranční meze proměnlivé velikosti dodaného vzorku a řeší realitu, kdy jeden kus kódu má současně spoustu odlišných prohřešků.
+Náhlý vzestup hodnoty na u-diagramu nad kontrolní mez indikuje speciální příčinu v procesu – například to, že System Architect Agent předal vývojáři konfliktní RAG kontext.
+
+**Detekce driftu pomocí CUSUM a LLM-as-a-judge**
+Některé defekty nelze měřit binárně (ani jako selhání JSONu, ani jako chybu linteru). Kvalita kódu, srozumitelnost dokumentace či byznys logiky představují spojité veličiny. Zde systém nasazuje LLM jako rozhodčího (LLM-as-a-judge) na statistickém vzorku (např. 5 % provozu) generovaných dat. Model ohodnotí kvalitu kódu od 1 do 100. Namísto běžných X-bar diagramů se pro tuto metriku používá CUSUM (Cumulative Sum Control Chart), který je extrémně citlivý na detekci pomalého sémantického driftu modelu, jež by v běžném denním šumu zůstal nepovšimnut.
+
+## 6. Omezení infrastruktury, Rate Limity a optimalizace provozu
+Návrh autonomního systému musí reflektovat reálná omezení infrastrukturního podvozku. Zadání předpokládá plné využití ekosystému GitHub včetně inference endpoints pro předplatné úrovně Pro. Zde je nutné pracovat s kritickou informací: platforma GitHub Models, která poskytovala přímé API endpointy k modelům pro prototypování s využitím Personal Access Tokenu, byla k 30. červenci 2026 plně vyřazena (retired) a její inference API není produkčně dostupné.
+
+Aby systém mohl operovat v produkčním měřítku, musí být integrace postaveny buď nativně nad GitHub Copilot Pro/Enterprise, nebo, pro plnou API flexibilitu, migrovány na infrastrukturu Azure AI Foundry, která s GitHub ekosystémem nativně kooperuje.
+
+### 6.1 Matematika propustnosti: TPM a RPM
+Obě zmíněné infrastruktury vymáhají striktní kvóty a omezení rychlosti, které chrání stabilitu serverů. Tyto metriky se vyjadřují jako Tokens Per Minute (TPM) a Requests Per Minute (RPM). Tyto hodnoty nejsou nezávislé. Typický konverzní poměr stanovený platformou definuje alokaci 6 RPM na každých 1 000 TPM limitu.
+
+Pro vysokokapacitní modely, jako je GPT-4o (nezbytné pro komplexní reasoning architektů), představují limity tvrdou překážku. Propustnost u těchto modelů často padá na pouhých 10 až 15 požadavků za minutu s maximálním povoleným limitem 2 souběžných (concurrent) volání. Pokud agent zpracovávající 100 000 TPM limit provede příliš mnoho drobných požadavků (např. 1 000 dotazů, každý po 100 tokenech) během 10 sekund, narazí na RPM strop a API odpoví chybou 429 (Too Many Requests), ačkoli celkový objem tokenů zdaleka nevyčerpal.
+
+Zároveň platí tvrdý strop 8 000 vstupních (input) tokenů na jeden požadavek v závislosti na konkrétní třídě endpointu. Odeslání raw souboru s dokumentací způsobí odmítnutí požadavku nebo spálení kvóty a následný masivní throttling.
+
+### 6.2 Ochranné mechanismy: Remote MCP a Jittered Exponential Backoff
+K bezpečnému operování uvnitř těchto úzkých mantinelů musí hodnotový tok implementovat dvě kritické optimalizace:
+* Remote MCP (Model Context Protocol) pro minimalizaci tokenů: Vkládání celých souborů, jako jsou obsáhlá databázová schémata (direct file injection), je neudržitelné. Systém proto využívá Remote MCP (často ve spojení s nástroji jako Fast.io). Agent neobdrží celý obsah repozitáře. Místo toho pošle specifický sémantický dotaz přes Streamable HTTP směrem k MCP serveru, který prohledá lokální nebo sdílený workspace a agentovi vrátí pouze ty zlomky kódu a dokumentace, jež jsou relevantní k řešenému problému. Tato redukce nákladů udržuje agenty hluboko pod 8000 tokenovým limitem a dramaticky snižuje využití TPM.
+* Jittered Exponential Backoff: Ve vysoce paralelním prostředí, kde QA Agent a Developer Agent mohou souběžně generovat tisíce API volání, je náraz do limitu (chyba 429) matematickou jistotou. Běžné systémy reagují opakovaným dotazováním, což vede ke zničujícím zacyklením a zahlcení spojení (retry storms). Autonomní agenti proto mají ve svém Python/Pydantic runtimu zabudovaný algoritmus Jittered Exponential Backoff. Pokud API neodpoví hlavičkou retry-after, agent vypočítá dobu pozastavení ($T_{sleep}$) v sekundách pro svůj $N$-tý pokus podle vzorce:
+$$T_{sleep} = 2^N + \text{Random}(0.5, 1.5)$$
+Tento proces (kde Random přidává nezbytný šum, aby se více čekajících agentů neprobudilo ve stejnou milisekundu) elegantně chrání pipeline před kolapsem a zachovává kontinuitu hodnotového toku i v případě krátkodobých výpadků infrastruktury.
+
+## 7. Závěr a syntéza rámce
+Vybudování plně autonomního vývojového hodnotového toku (End-to-End Autonomous Dev Pipeline) za pomoci GitHub Agentic Workflows představuje radikální posun od reaktivního doplňování kódu k proaktivní integraci umělé inteligence do hlubokých inženýrských struktur. Aby takový systém nevedl ke generování technického chaosu, je absolutně nezbytné ukotvit jej v rigorózních procesech a exaktních kontraktech.
+
+Z provedené analytické syntézy plynou následující klíčová doporučení pro úspěšnou realizaci:
+* Zaprvé, komunikace mezi specializovanými agenty (BA, Architekt, Vývojář, QA) se nesmí opírat o slabě typovaný text nebo holé JSON módy, které zastírají halucinace modelů a tichou absenci kontextu. Nasazení Pydantic AI pro definici striktních předávacích protokolů, obohacených o data provenience, transformuje nespolehlivý přenos informací na vysoce garantované datové smlouvy, které bezpečně zhavarují dříve, než nakazí repozitář nesmysly.
+* Zadruhé, pro hladkou orchestraci asynchronních běhů je nutné zcela opustit využívání výchozího GITHUB_TOKEN, který platforma GitHub designově omezuje v řetězení akcí kvůli ochraně proti event loops. Namísto toho musí pipeline využívat krátkodobé JWT a instalační tokeny z dedikované GitHub App s granulárními přístupovými právy. To umožní agentům komunikovat vzájemně skrz modifikace štítků a komentářů v Issues bez bezpečnostních kompromisů spojených s využitím osobních tokenů (PAT).
+* Zatřetí, opuštění masové lidské kontroly a přechod k Demingovu modelu kvality vyžaduje kvantifikovatelný přístup. Nasazení nástrojů Statistické kontroly procesů (SPC) – především p-diagramů pro dynamické sledování chybovosti Pydantic schémat, u-diagramů pro zjišťování hustoty defektů v pull requestech a CUSUM pro dlouhodobé LLM-as-a-judge evaluace – poskytuje inženýrům platformy rentgenový pohled na zdraví jejich "křemíkové" pracovní síly.
+
+Tímto spojením striktního stavového automatu, sofistikovaných AI modelů operujících na Azure infrastruktuře pod přísnou obranou před rychlostními limity, a průmyslových standardů pro kontrolu kvality, je možné materializovat vizi organizace, kde myšlenka v GitHub Issue autonomně probublá od prvotní analýzy až po integraci otestovaného kódu.
