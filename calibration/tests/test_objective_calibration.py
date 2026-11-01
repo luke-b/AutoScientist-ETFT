@@ -5,10 +5,7 @@ ObjectiveCalibration (mocked sandbox + similarity).
 
 from __future__ import annotations
 
-import pytest
-
 from calibration.objective_calibration import ObjectiveCalibration, ObjectiveCalibrationResult
-
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

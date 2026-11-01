@@ -6,13 +6,10 @@ AdapterLibrary (CRUD operations using temporary directories).
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 
 import pytest
 
-from synthesis.lora_routing.adapter_library import AdapterLibrary, AdapterRecord
-
+from synthesis.lora_routing.adapter_library import AdapterLibrary
 
 # ---------------------------------------------------------------------------
 # Fixtures

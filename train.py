@@ -508,6 +508,9 @@ def main() -> None:
     data_root = Path(args.dataset)
 
     # Determine output directory based on training mode
+    train_cfg = cfg.get("train", {})
+    oc_cfg = cfg.get("orthogonal_calibration", {})
+
     if args.output_dir:
         output_dir = Path(args.output_dir)
     elif args.mode == "width" and args.generation is not None:
