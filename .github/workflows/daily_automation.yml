@@ -1,0 +1,57 @@
+name: Daily Automation
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-task:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PyGithub python-dotenv requests httpx tenacity pyyaml pydantic
+          pip install -e .
+
+      - name: Build and Start LLM Proxy
+        run: |
+          docker build -f docker/agent/Dockerfile -t autoscientist-etft-agent:latest .
+          docker run -d --name etft-agent-proxy -p 8080:8080 -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" autoscientist-etft-agent:latest
+
+      - name: Wait for Proxy
+        run: |
+          sleep 5
+
+      - name: Run daily automation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          AGENT_PROXY_URL: http://localhost:8080
+          AGENT_PROXY_TOKEN: test-token
+        run: |
+          python scripts/daily_automation.py
+
+      - name: Stop LLM Proxy
+        if: always()
+        run: |
+          docker stop etft-agent-proxy || true
+
+      - name: Create Pull Request or Commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Automated daily gap analysis and task generation"
+          file_pattern: "daily_reports/*"
