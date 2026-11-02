@@ -14,8 +14,8 @@ sandbox:
   # with no container boundary — only use it in fully trusted environments or
   # when Docker is genuinely unavailable.
   backend: "docker"    # "docker" (recommended) | "subprocess" (unsafe fallback)
-  image: "python:3.11-slim"
-  mem_limit: "512m"
+  image: "etft-sandbox:latest"
+  mem_limit: "256m"
   cpu_count: 1
   network_disabled: true
   timeout_seconds: 60
@@ -203,7 +203,7 @@ cluster:
 
   k8s:
     namespace: "default"
-    image: "python:3.11-slim"
+    image: "etft-sandbox:latest"
     gpu_count: 1
     memory_limit: "8Gi"
     cpu_limit: "4"
