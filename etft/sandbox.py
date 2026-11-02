@@ -91,8 +91,8 @@ class DockerSandbox:
     def __init__(self, cfg: dict | None = None) -> None:
         sandbox_cfg = (cfg or {}).get("sandbox", {})
         self._backend: str = sandbox_cfg.get("backend", "subprocess")
-        self._image: str = sandbox_cfg.get("image", "python:3.11-slim")
-        self._mem_limit: str = str(sandbox_cfg.get("mem_limit", "512m"))
+        self._image: str = sandbox_cfg.get("image", "etft-sandbox:latest")
+        self._mem_limit: str = str(sandbox_cfg.get("mem_limit", "256m"))
         self._cpu_count: int = int(sandbox_cfg.get("cpu_count", 1))
         self._network_disabled: bool = bool(sandbox_cfg.get("network_disabled", True))
         self._timeout: int = int(sandbox_cfg.get("timeout_seconds", 60))
