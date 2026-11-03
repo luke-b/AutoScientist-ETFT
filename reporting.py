@@ -105,6 +105,7 @@ def _to_report_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = []
     for s in summaries:
         metrics = s.get("metrics") or {}
+        metric_stats = metrics.get("metrics") or {}
         row = {
             "run_id": s.get("run_id", "—"),
             "bottleneck": s.get("bottleneck", "—"),
@@ -113,6 +114,9 @@ def _to_report_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "success_rate": metrics.get("success_rate", 0.0),
             "top_skills": ", ".join(s.get("_top_skills") or []) or "—",
             "alert_count": s.get("_alert_count", 0),
+            "flops": metric_stats.get("flops", {}).get("mean", None),
+            "params": metric_stats.get("params", {}).get("mean", None),
+            "binary_size": metric_stats.get("binary_size", {}).get("mean", None),
         }
         rows.append(row)
     return rows
@@ -132,6 +136,9 @@ def _print_rich_table(rows: list[dict[str, Any]]) -> None:
         table.add_column("Timestamp", style="dim")
         table.add_column("Experiments", justify="right")
         table.add_column("Success %", justify="right")
+        table.add_column("FLOPs", justify="right")
+        table.add_column("Params", justify="right")
+        table.add_column("Bin Size", justify="right")
         table.add_column("Top Skills")
         table.add_column("Alerts", justify="right")
 
@@ -140,12 +147,19 @@ def _print_rich_table(rows: list[dict[str, Any]]) -> None:
             alert_str = str(row["alert_count"])
             alert_style = "red" if row["alert_count"] > 0 else "green"
 
+            flops_str = f"{row['flops']:.1e}" if row["flops"] is not None else "—"
+            params_str = f"{row['params']:.1e}" if row["params"] is not None else "—"
+            bin_size_str = f"{row['binary_size']:.0f}B" if row["binary_size"] is not None else "—"
+
             table.add_row(
                 row["run_id"],
                 row["bottleneck"],
                 row["timestamp"],
                 str(row["total_experiments"]),
                 success_pct,
+                flops_str,
+                params_str,
+                bin_size_str,
                 row["top_skills"],
                 f"[{alert_style}]{alert_str}[/{alert_style}]",
             )
@@ -172,15 +186,19 @@ def _print_plain_table(rows: list[dict[str, Any]]) -> None:
     """Fallback plain-text table (no Rich dependency)."""
     header = (
         f"{'Run ID':<14} {'Bottleneck':<25} {'Timestamp':<20} "
-        f"{'Exps':>6} {'Succ%':>7} {'Alerts':>7}  Top Skills"
+        f"{'Exps':>6} {'Succ%':>7} {'FLOPs':>9} {'Params':>9} {'Bin Size':>9} {'Alerts':>7}  Top Skills"
     )
     print(header)
     print("-" * len(header))
     for row in rows:
         success_pct = f"{row['success_rate']:.0%}"
+        flops_str = f"{row['flops']:.1e}" if row["flops"] is not None else "—"
+        params_str = f"{row['params']:.1e}" if row["params"] is not None else "—"
+        bin_size_str = f"{row['binary_size']:.0f}B" if row["binary_size"] is not None else "—"
+
         print(
             f"{row['run_id']:<14} {row['bottleneck']:<25} {row['timestamp']:<20} "
-            f"{row['total_experiments']:>6} {success_pct:>7} {row['alert_count']:>7}  "
+            f"{row['total_experiments']:>6} {success_pct:>7} {flops_str:>9} {params_str:>9} {bin_size_str:>9} {row['alert_count']:>7}  "
             f"{row['top_skills']}"
         )
 

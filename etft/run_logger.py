@@ -274,6 +274,12 @@ class RunLogger:
             mlflow.log_metric("run/total_experiments", summary.get("total_experiments", 0))
             mlflow.log_metric("run/alert_count", summary.get("alert_count", 0))
             mlflow.set_tag("etft.bottleneck", summary.get("bottleneck", ""))
+
+            # Log hardware-centric metric means if available
+            metric_stats = metrics.get("metrics") or {}
+            for hw_metric in ["flops", "params", "binary_size"]:
+                if hw_metric in metric_stats:
+                    mlflow.log_metric(f"run/mean_{hw_metric}", metric_stats[hw_metric].get("mean", 0.0))
         except ImportError:
             pass
 
