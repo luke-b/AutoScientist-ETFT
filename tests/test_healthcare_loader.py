@@ -1,6 +1,9 @@
 import numpy as np
+import pytest
 
-from corpus.healthcare_loader import get_heart_failure_dataset
+pytest.importorskip("pandas")
+pytest.importorskip("datasets")
+from corpus.healthcare_loader import get_heart_failure_dataset  # noqa: E402
 
 
 def test_get_heart_failure_dataset():
