@@ -12,8 +12,6 @@
 [![LLMs](https://img.shields.io/badge/Paradigm-Agentic%20R%26D-purple)](https://github.com/luke-b/AutoScientist-ETFT)
 
 > **"Teaching machines not just what we know — but the very mechanics of how we invent."**
->
-> — *Lukas Benda, BoldPivot*
 
 </div>
 
