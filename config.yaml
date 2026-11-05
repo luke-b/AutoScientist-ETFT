@@ -157,6 +157,13 @@ agents:
       - scipy
       - torch
       - sklearn
+      - pandas
+      - datasets
+      - urllib
+      - io
+      - csv
+      - corpus
+      - pickle
     blocked_builtins:               # Additional dangerous builtins to block (beyond defaults)
       - exec
       - eval

@@ -1,22 +1,21 @@
 # Iteration State
 
-- **Latest completed iteration:** 2024-12-10-data-acquisition-preprocessing
+- **Latest completed iteration:** 2026-11-05-reverse-engineering-trajectory
 - **Current branch and commit:** Working tree
-- **Delivered capabilities:** Data loader `corpus/healthcare_loader.py` for fetching and preprocessing healthcare data (`mstz/heart_failure`) for training TinyML algorithms.
+- **Delivered capabilities:** Configured pipeline and sandbox to support standard ML tabular models (e.g. `pandas`, `datasets`). Authored `corpus/seed_models/health_edge_sota.py` to seed a TinyML trajectory.
 - **Outstanding gaps and blockers:**
-  - Proceed to Milestone 2.2 (Reverse-Engineering the TinyML Trajectory).
+  - Proceed to Phase 3: "GPU-Poor" ETFT Deployment (Milestone 3.1: Pareto Optimization Calibration).
 - **Current production-readiness evidence:**
-  - Unit tests for the loader pass, returning normalized arrays.
+  - Full test suite passes. Regression pipeline successfully executes `health_edge_sota.py` and builds a trajectory.
 - **Remaining requirement coverage:**
-  - Remaining elements in Phase 2-4 of development roadmap.
-- **Recommended next slice:** Milestone 2.2: Reverse-Engineering the TinyML Trajectory.
-- **Next required tool action:** Check `corpus/regression_pipeline/run.py` to support regression on standard tabular ML models.
+  - Remaining elements in Phase 3-4 of development roadmap.
+- **Recommended next slice:** Milestone 3.1: Pareto Optimization Calibration.
+- **Next required tool action:** Check `analysis/pareto_delta/` to prioritize bottlenecks related to activation memory footprints and train the Probabilistic Heuristic Filter (`D_Perf`).
 - **Links to all generated iteration artifacts:**
-  - `docs/iterations/2024-12-10/ITER-0003-data-acquisition-preprocessing/2024-12-10-gap.md`
-  - `docs/iterations/2024-12-10/ITER-0003-data-acquisition-preprocessing/2024-12-10-plan.md`
-  - `docs/iterations/2024-12-10/ITER-0003-data-acquisition-preprocessing/2024-12-10-review.md`
-  - `docs/iterations/2024-12-10/ITER-0003-data-acquisition-preprocessing/2024-12-10-evidence.md`
-  - `docs/iterations/2024-12-10/ITER-0003-data-acquisition-preprocessing/2024-12-10-handoff.md`
+  - `docs/iterations/2026-11-05/ITER-0004-reverse-engineering-trajectory/2026-11-05-gap.md`
+  - `docs/iterations/2026-11-05/ITER-0004-reverse-engineering-trajectory/2026-11-05-plan.md`
+  - `docs/iterations/2026-11-05/ITER-0004-reverse-engineering-trajectory/2026-11-05-evidence.md`
+  - `docs/iterations/2026-11-05/ITER-0004-reverse-engineering-trajectory/2026-11-05-handoff.md`
 
 ## Status
 PASS
