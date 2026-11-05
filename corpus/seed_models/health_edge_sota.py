@@ -1,18 +1,19 @@
-import numpy as np
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
-import urllib.request
 import csv
-from io import StringIO
+import urllib.request
+
+import numpy as np
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
+
 
 def get_heart_failure_dataset(test_size: float = 0.2, random_state: int = 42):
     url = "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" # placeholder for heart failure
     response = urllib.request.urlopen(url)
-    lines = [l.decode('utf-8') for l in response.readlines()]
+    lines = [line.decode('utf-8') for line in response.readlines()]
     reader = csv.reader(lines)
-    header = next(reader)
+    next(reader)
     data = []
     for row in reader:
         data.append([float(x) for x in row])
@@ -28,10 +29,10 @@ def get_heart_failure_dataset(test_size: float = 0.2, random_state: int = 42):
     return x_train, x_test, y_train, y_test
 
 def main():
-    X_train, X_test, y_train, y_test = get_heart_failure_dataset()
+    x_train, x_test, y_train, y_test = get_heart_failure_dataset()
     clf = DecisionTreeClassifier(max_depth=3, random_state=42)
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
+    clf.fit(x_train, y_train)
+    y_pred = clf.predict(x_test)
     acc = accuracy_score(y_test, y_pred)
     import pickle
     model_size_bytes = len(pickle.dumps(clf))
