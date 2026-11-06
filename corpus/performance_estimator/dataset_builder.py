@@ -33,8 +33,14 @@ class PerfDatasetBuilder:
         Returns the created PerfSample.
         """
         features = extract_features(code)
-        label = 0 if result.passed else 1
-        failure_reason = None if result.passed else result.status.value
+
+        # Enforce the 256KB (0.25 MB) edge-memory limit (Milestone 3.1)
+        if result.passed and result.peak_memory_mb > 0.25:
+            label = 1
+            failure_reason = "fail_oom"
+        else:
+            label = 0 if result.passed else 1
+            failure_reason = None if result.passed else result.status.value
 
         sample = PerfSample(
             algorithm_id=algorithm_id,

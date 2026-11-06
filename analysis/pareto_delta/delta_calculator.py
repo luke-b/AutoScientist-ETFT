@@ -70,6 +70,7 @@ _COMPONENT_PATTERNS: list[tuple[str, str]] = [
     (r"^\+.*Dropout", "dropout"),
     (r"^\+.*attention|Attention", "attention_mechanism"),
     (r"^\+.*residual|skip.connect", "residual_connection"),
+    (r"^\+.*relu|sigmoid|tanh|activation", "activation_function"),
 ]
 
 
