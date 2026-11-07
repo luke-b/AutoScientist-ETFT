@@ -42,6 +42,7 @@ def run_arl(
     bottleneck: str,
     output_dir: Path,
     data_root: Path | None = None,
+    query_override: str | None = None,
 ) -> dict:
     """
     Execute the Agentic Research Loop for *bottleneck*.
@@ -87,7 +88,7 @@ def run_arl(
     vector_store = build_vector_store(cfg)
 
     # --- Phase 1: Literature synthesis ---
-    query = f"{bottleneck} deep learning improvement techniques"
+    query = query_override if query_override else f"{bottleneck} deep learning improvement techniques"
     searcher = LiteratureSearcher(cfg)
     papers = searcher.search(query)
     logger.info("Retrieved %d papers.", len(papers))
@@ -176,6 +177,11 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Architectural bottleneck component, e.g. 'batch_normalisation'.",
     )
+    parser.add_argument(
+        "--query",
+        default=None,
+        help="Custom search query (overrides default '{bottleneck} deep learning improvement techniques').",
+    )
     parser.add_argument("--output-dir", default="./data/arl_results", help="Output directory.")
     parser.add_argument("--config", default="config.yaml")
     return parser.parse_args()
@@ -184,7 +190,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    run_arl(cfg, args.bottleneck, Path(args.output_dir))
+    run_arl(cfg, args.bottleneck, Path(args.output_dir), query_override=args.query)
 
 
 if __name__ == "__main__":
