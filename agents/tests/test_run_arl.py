@@ -1,25 +1,25 @@
-import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from agents.run_arl import run_arl
 
+
 def test_run_arl_domain_query():
     # We mock out all the heavy external integrations
-    with patch("agents.run_arl.build_vector_store") as mock_build_vs, \
-         patch("agents.run_arl.LiteratureSearcher") as MockSearcher, \
-         patch("agents.run_arl.LiteratureRetriever") as MockRetriever, \
-         patch("agents.run_arl.LiteratureSynthesizer") as MockSynthesizer, \
-         patch("agents.run_arl.ExperimentDesigner") as MockDesigner, \
-         patch("agents.run_arl.ExperimentRunner") as MockRunner, \
-         patch("agents.run_arl.MetricsCollector") as MockCollector, \
-         patch("etft.run_logger.RunLogger") as MockRunLogger, \
-         patch("feedback.rl_loop.feedback_router.FeedbackRouter") as MockFeedbackRouter, \
+    with patch("agents.run_arl.build_vector_store"), \
+         patch("agents.run_arl.LiteratureSearcher") as mock_searcher, \
+         patch("agents.run_arl.LiteratureRetriever"), \
+         patch("agents.run_arl.LiteratureSynthesizer") as mock_synthesizer, \
+         patch("agents.run_arl.ExperimentDesigner"), \
+         patch("agents.run_arl.ExperimentRunner"), \
+         patch("agents.run_arl.MetricsCollector") as mock_collector, \
+         patch("etft.run_logger.RunLogger"), \
+         patch("feedback.rl_loop.feedback_router.FeedbackRouter") as mock_feedback_router, \
          patch("pathlib.Path.mkdir"), \
          patch("builtins.open"):
 
         # Set up a fake synthesis so the loop completes without error
-        mock_synthesizer_instance = MockSynthesizer.return_value
+        mock_synthesizer_instance = mock_synthesizer.return_value
         mock_brief = MagicMock()
         mock_brief.hypotheses = ["Test Hypothesis 1"]
         # Return a dictionary directly so json.dump works
@@ -27,13 +27,13 @@ def test_run_arl_domain_query():
         mock_synthesizer_instance.synthesize.return_value = mock_brief
 
         # We need mock router to return a string
-        mock_router_instance = MockFeedbackRouter.return_value
+        mock_router_instance = mock_feedback_router.return_value
         mock_router_instance.build_rl_context_prefix.return_value = "fake prefix"
 
-        mock_collector_instance = MockCollector.return_value
+        mock_collector_instance = mock_collector.return_value
         mock_collector_instance.to_dict.return_value = {"success_rate": 1.0}
 
-        mock_searcher_instance = MockSearcher.return_value
+        mock_searcher_instance = mock_searcher.return_value
         mock_searcher_instance.search.return_value = []
 
         cfg = {"vector_store": {}, "agents": {}}

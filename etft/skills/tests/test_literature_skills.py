@@ -1,4 +1,5 @@
-from etft.skills.literature_skills import SearchArxivSkill, FetchAndChunkPapersSkill
+from etft.skills.literature_skills import FetchAndChunkPapersSkill, SearchArxivSkill
+
 
 def test_skills_init():
     skill1 = SearchArxivSkill()
