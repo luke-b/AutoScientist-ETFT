@@ -43,6 +43,7 @@ def run_arl(
     output_dir: Path,
     data_root: Path | None = None,
     query_override: str | None = None,
+    domain: str | None = None,
 ) -> dict:
     """
     Execute the Agentic Research Loop for *bottleneck*.
@@ -88,7 +89,13 @@ def run_arl(
     vector_store = build_vector_store(cfg)
 
     # --- Phase 1: Literature synthesis ---
-    query = query_override if query_override else f"{bottleneck} deep learning improvement techniques"
+    if query_override:
+        query = query_override
+    elif domain == "tinyml":
+        query = f"{bottleneck} ultra-low-power time series classification hardware-aware neural architecture search"
+    else:
+        query = f"{bottleneck} deep learning improvement techniques"
+
     searcher = LiteratureSearcher(cfg)
     papers = searcher.search(query)
     logger.info("Retrieved %d papers.", len(papers))
@@ -178,6 +185,11 @@ def parse_args() -> argparse.Namespace:
         help="Architectural bottleneck component, e.g. 'batch_normalisation'.",
     )
     parser.add_argument(
+        "--domain",
+        default=None,
+        help="Domain area (e.g. 'tinyml') to use predefined queries.",
+    )
+    parser.add_argument(
         "--query",
         default=None,
         help="Custom search query (overrides default '{bottleneck} deep learning improvement techniques').",
@@ -190,7 +202,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    run_arl(cfg, args.bottleneck, Path(args.output_dir), query_override=args.query)
+    run_arl(
+        cfg,
+        args.bottleneck,
+        Path(args.output_dir),
+        query_override=args.query,
+        domain=args.domain,
+    )
 
 
 if __name__ == "__main__":
