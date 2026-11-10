@@ -1,21 +1,23 @@
 # Iteration State
 
-- **Latest completed iteration:** 2026-11-06-pareto-optimization-calibration
+- **Latest completed iteration:** 2026-11-10-launch-agentic-research-loop
 - **Current branch and commit:** Working tree
-- **Delivered capabilities:** Tuned the Retrospective 80/20 Δ Analysis to prioritize bottlenecks related to activation memory footprints. Trained the Probabilistic Heuristic Filter (`D_Perf`) to aggressively reject candidates exceeding a 256KB memory threshold.
+- **Delivered capabilities:** Verified and executed Milestone 3.2: Launch the Agentic Research Loop. Proved functionality for ArXiv queries on "time series classification techniques" inside CPU sandboxes.
 - **Outstanding gaps and blockers:**
-  - Proceed to Milestone 3.2: Launch the Agentic Research Loop.
+  - Proceed to Milestone 3.3: SOTA+1 Synthesis & Calibration
 - **Current production-readiness evidence:**
-  - The E2E tests and synthetic bootstrap training run perfectly and log successful checks of the threshold limits.
+  - The E2E test passes (`pytest tests/test_e2e.py`).
+  - The ARL script orchestrates the pipeline correctly when the Agent API proxy runs locally.
 - **Remaining requirement coverage:**
-  - Remaining elements in Phase 3-4 of development roadmap (e.g. Milestone 3.2).
-- **Recommended next slice:** Milestone 3.2: Launch the Agentic Research Loop.
-- **Next required tool action:** Check `agents/literature/` to implement and deploy ArXiv queries for time series classification techniques on CPU sandboxes.
+  - Remaining elements in Phase 3 (Milestone 3.3) and Phase 4 of development roadmap.
+- **Recommended next slice:** Milestone 3.3: SOTA+1 Synthesis & Calibration
+- **Next required tool action:** Check `synthesis/sota_plus_one/` to verify and execute the Evolutionary Replay stage-gate and synthesize the SOTA+1 architecture.
 - **Links to all generated iteration artifacts:**
-  - `docs/iterations/2026-11-06/ITER-0005-pareto-optimization-calibration/2026-11-06-gap.md`
-  - `docs/iterations/2026-11-06/ITER-0005-pareto-optimization-calibration/2026-11-06-plan.md`
-  - `docs/iterations/2026-11-06/ITER-0005-pareto-optimization-calibration/2026-11-06-evidence.md`
-  - `docs/iterations/2026-11-06/ITER-0005-pareto-optimization-calibration/2026-11-06-handoff.md`
+  - `docs/iterations/2026-11-10/ITER-0006-launch-agentic-research-loop/2026-11-10-gap.md`
+  - `docs/iterations/2026-11-10/ITER-0006-launch-agentic-research-loop/2026-11-10-plan.md`
+  - `docs/iterations/2026-11-10/ITER-0006-launch-agentic-research-loop/2026-11-10-evidence.md`
+  - `docs/iterations/2026-11-10/ITER-0006-launch-agentic-research-loop/2026-11-10-review.md`
+  - `docs/iterations/2026-11-10/ITER-0006-launch-agentic-research-loop/2026-11-10-handoff.md`
 
 ## Status
 PASS
