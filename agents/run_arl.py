@@ -120,7 +120,7 @@ def run_arl(
         rl_prefix = router.build_rl_context_prefix()
 
         try:
-            script = designer.design(brief, hypothesis_index=i, rl_context=rl_prefix)
+            script = designer.design(brief, hypothesis_index=i, rl_context=rl_prefix, domain=domain)
         except Exception as exc:
             logger.error("Experiment design failed for hypothesis %d: %s", i, exc)
             continue
