@@ -100,6 +100,27 @@ def test_designer_empty_rl_context_not_injected():
     assert "rl_feedback" not in call_kwargs_full.get("context", {})
 
 
+def test_designer_domain_tinyml_adds_memory_constraint():
+    """When domain is 'tinyml', the task prompt should include the 256KB constraint."""
+    from etft.skills.base import AgentResult
+
+    designer = ExperimentDesigner.__new__(ExperimentDesigner)
+    designer._agent = MagicMock()
+    designer._agent.run_task.return_value = AgentResult(
+        output="```python\nprint('METRIC: v=1')\n```",
+        steps=[],
+        skills_invoked=[],
+        success=True,
+    )
+    designer.max_script_size = 65536
+
+    designer.design(_make_brief(), hypothesis_index=0, domain="tinyml")
+
+    call_kwargs_full = designer._agent.run_task.call_args.kwargs
+    task_prompt = call_kwargs_full.get("task", "")
+    assert "Ensure the peak memory footprint stays under the 256KB constraint" in task_prompt
+
+
 def test_designer_no_hypotheses_raises():
     designer = ExperimentDesigner.__new__(ExperimentDesigner)
     designer._agent = MagicMock()

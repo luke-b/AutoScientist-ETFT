@@ -65,6 +65,7 @@ class ExperimentDesigner:
         brief: ResearchBrief,
         hypothesis_index: int = 0,
         rl_context: str = "",
+        domain: str | None = None,
     ) -> str:
         """
         Generate a micro-experiment script for the *hypothesis_index*-th
@@ -81,6 +82,8 @@ class ExperimentDesigner:
             signals from prior failed experiments in this campaign).  When
             provided it is prepended to the agent context so the LLM avoids
             repeating previously observed failure patterns.
+        domain:
+            Optional domain for task-specific instructions (e.g. "tinyml").
 
         Returns
         -------
@@ -94,13 +97,24 @@ class ExperimentDesigner:
         target = hypotheses[idx]
 
         hypothesis_list = "\n".join(f"  {i+1}. {h}" for i, h in enumerate(hypotheses))
-        task = (
-            f"Write a self-contained Python micro-experiment script that validates this "
-            f"hypothesis: '{target}'. The script must run in under 2 minutes on CPU, print "
-            f"'METRIC: <name>=<value>' for each metric, use only whitelisted packages "
-            f"(numpy, scipy, sklearn, torch CPU only), and use synthetic data only. "
-            f"Respond with ONLY the Python source code in ```python ... ``` fences."
-        )
+
+        if domain == "tinyml":
+            task = (
+                f"Write a self-contained Python micro-experiment script that validates this "
+                f"hypothesis: '{target}'. The script must run in under 2 minutes on CPU, print "
+                f"'METRIC: <name>=<value>' for each metric, use only whitelisted packages "
+                f"(numpy, scipy, sklearn, torch CPU only), and use synthetic data only. "
+                f"Ensure the peak memory footprint stays under the 256KB constraint. "
+                f"Respond with ONLY the Python source code in ```python ... ``` fences."
+            )
+        else:
+            task = (
+                f"Write a self-contained Python micro-experiment script that validates this "
+                f"hypothesis: '{target}'. The script must run in under 2 minutes on CPU, print "
+                f"'METRIC: <name>=<value>' for each metric, use only whitelisted packages "
+                f"(numpy, scipy, sklearn, torch CPU only), and use synthetic data only. "
+                f"Respond with ONLY the Python source code in ```python ... ``` fences."
+            )
 
         context: dict = {
             "bottleneck": brief.bottleneck,
