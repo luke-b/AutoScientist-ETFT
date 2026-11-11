@@ -194,9 +194,9 @@ def test_arl_rl_prefix_grows_with_failures(tmp_path: Path) -> None:
     import agents.empirical.experiment_designer as _ed_mod
     original_design = _ed_mod.ExperimentDesigner.design
 
-    def _patched_design(self, brief, hypothesis_index=0, rl_context=""):
+    def _patched_design(self, brief, hypothesis_index=0, rl_context="", domain=None):
         rl_contexts_seen.append(rl_context)
-        return original_design(self, brief, hypothesis_index=hypothesis_index, rl_context=rl_context)
+        return original_design(self, brief, hypothesis_index=hypothesis_index, rl_context=rl_context, domain=domain)
 
     with (
         patch("etft.llm.LLMClient.complete_with_tools", side_effect=_mock_complete),
